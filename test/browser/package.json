@@ -1,0 +1,17 @@
+{
+  "name": "aibo-browser-tests",
+  "version": "1.0.0",
+  "description": "Aibo Browser E2E Tests with Playwright",
+  "private": true,
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:ui": "npx playwright test --ui",
+    "test:debug": "npx playwright test --debug",
+    "report": "npx playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0",
+    "typescript": "^5.5.0"
+  }
+}
