@@ -179,3 +179,90 @@ LLM Client 模組 -> F-003 / F-005（並行）
 | LLM Client 模組延遲 | F-003 和 F-005 都阻塞 | 最高優先級完成，介面先定義好讓 F-003/F-005 可 mock 開發 |
 | LLM 回傳品質不穩定 | 分類/搜尋結果不佳 | 防禦性 parse + 降級策略 |
 | 背景 worker 穩定性 | 分類任務丟失 | channel buffer + graceful shutdown |
+
+---
+
+# Sprint 3 依賴圖譜
+
+## 功能總覽
+
+| 編號 | 名稱 | 優先級 | 工作量 |
+|------|------|--------|-------|
+| F-008 | Git 整合 | P2 | 中 |
+| F-009 | Google Calendar 整合 | P2 | 大（含 OAuth2 flow + DB migration） |
+
+## 依賴關係
+
+```
+Sprint 1/2 已完成基礎設施
+├── Entry CRUD（F-001）— 匯入的 commit/event 儲存為 Entry
+├── API Key 認證（F-010）— 所有 import API 需認證
+└── AES-256 加密模組（crypto/aes.go）— F-009 token 加密
+
+Sprint 3 新功能
+├── F-008 Git 整合
+│   ├── 依賴 Entry Repository（建立 entry、source_ref 去重查詢）
+│   ├── 依賴 API Key 認證 middleware
+│   ├── 新增 go-git 依賴
+│   └── 無 DB migration（直接使用 Entry model）
+│
+└── F-009 Google Calendar 整合
+    ├── 依賴 Entry Repository（建立 entry、source_ref 去重查詢）
+    ├── 依賴 API Key 認證 middleware
+    ├── 依賴 AES-256 加密模組（token 加密儲存）
+    ├── 新增 DB migration（gcal_integrations table）
+    ├── 新增 Google OAuth2 依賴
+    └── 新增 Google Calendar API 依賴
+```
+
+## 依賴說明
+
+### F-008 與 F-009 互相獨立
+- F-008 使用 go-git 讀取本機 repo，F-009 使用 Google API 讀取 Calendar
+- 兩者都匯入為 Entry，但 source_type 不同（"git" vs "gcal"）
+- 無共用模組需先建立，可完全並行開發
+
+### 對 Sprint 1/2 既有模組的依賴
+- **Entry Repository**：兩者都使用 `source_ref` 欄位做去重查詢，需確認 Entry model 已有 source_type/source_ref/source 欄位
+- **AES-256 加密**：F-009 需使用既有的 crypto 模組加密 OAuth token
+- **Auth Middleware**：所有新 endpoint 都經過 API Key 認證
+
+## 拓撲排序
+
+### Wave 0（可完全並行）
+- **F-008: Git 整合** — 無 DB migration，只依賴既有 Entry CRUD
+- **F-009: Google Calendar 整合** — 含 DB migration（gcal_integrations）+ OAuth2 flow
+- **QA: 撰寫 E2E test script** — 根據 spec scenarios 撰寫測試案例
+
+### 無 Wave 1
+- F-008 和 F-009 無互相依賴，全部在 Wave 0 並行
+
+## 並行策略
+
+```
+時間線 ->
+
+Wave 0:  [F-008 Git 整合 ────────────────────]
+         [F-009 Google Calendar 整合 ─────────────────────]
+         [QA 撰寫 test script ────────────────────────────]
+
+Code Review:         [逐 PR 審查 ─────────────────────────]
+```
+
+## 關鍵路徑
+
+F-009（Google Calendar 整合）為最長路徑，因為包含：
+1. DB migration（gcal_integrations table）
+2. OAuth2 授權流程（auth + callback）
+3. Token 加密儲存
+4. Calendar 事件匯入
+
+F-008 相對簡單，預計先完成。
+
+## 風險項目
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| Entry model 缺少 source_type/source_ref 欄位 | 需補 migration | 確認 Sprint 1 的 Entry schema 已包含這些欄位 |
+| Docker 容器無法存取宿主機 Git repo | F-008 功能受限 | 文件說明 volume mount 方式 |
+| Google OAuth redirect URL 設定 | 授權流程失敗 | 環境變數配置 + 文件說明 |

@@ -604,3 +604,212 @@ Sprint 2 僅新增 2 個依賴，維持專案精簡。
 | LLM 同義詞展開 timeout | 搜尋延遲或失敗 | 10 秒 timeout + 自動降級為原始 query 搜尋 |
 | 背景 goroutine 記憶體洩漏 | 服務不穩定 | context 取消 + WaitGroup + channel buffer 限制 |
 | 批次分類大量 entries 時耗時過長 | 使用者等待 | 202 非同步回應 + 序列處理 + rate limiting |
+
+---
+
+# Sprint 3 技術選型補充調查
+
+## 調查日期
+2026-04-22
+
+## 17. Git 操作方式：go-git vs exec git command
+
+### 候選方案
+
+| 方案 | GitHub Stars | 優點 | 缺點 | 適用場景 |
+|------|-------------|------|------|---------|
+| go-git v5 | 6k+ | 純 Go 實作、無需系統 git 二進位、跨平台、可直接存取 commit object | 不支援所有 git 功能（如 merge porcelain）、記憶體使用較高 | 讀取 repo 資訊、遍歷 commits |
+| exec.Command("git", ...) | N/A | 完整 git 功能、效能好（原生 C 實作）、輸出格式熟悉 | 依賴系統安裝 git、需解析 CLI 輸出、跨平台差異、需防範 command injection | 完整 git 操作 |
+
+### 決策
+選擇 **go-git v5**（`github.com/go-git/go-git/v5`）
+
+### 理由
+1. **純 Go 無外部依賴**：aibo 透過 Docker 部署，使用 go-git 不需要在容器中安裝 git binary，減少映像體積
+2. **API 直接存取 commit object**：可直接取得 commit hash、message、author、parent count 等結構化資料，不需解析 CLI 輸出
+3. **F-008 需求完全匹配**：只需讀取 commit log（PlainOpen + Log + ForEach），go-git 的讀取功能成熟穩定
+4. **安全性**：避免 exec.Command 的 command injection 風險，repo_path 來自使用者輸入
+5. **測試友善**：可用 go-git 的 memory storage 建立測試用 repo，不需要檔案系統
+
+### 使用方式
+
+```go
+import (
+    git "github.com/go-git/go-git/v5"
+    "github.com/go-git/go-git/v5/plumbing/object"
+)
+
+// 開啟本地 repo
+repo, err := git.PlainOpen(repoPath)
+
+// 取得 commit log
+logIter, err := repo.Log(&git.LogOptions{
+    From:  ref.Hash(),   // 從指定 branch HEAD 開始
+    Order: git.LogOrderCommitterTime,
+})
+
+// 遍歷 commits，手動過濾 date/author
+err = logIter.ForEach(func(c *object.Commit) error {
+    // 過濾日期範圍
+    if c.Committer.When.Before(since) || c.Committer.When.After(until) {
+        return nil
+    }
+    // 過濾 author
+    if author != "" && c.Author.Email != author && c.Author.Name != author {
+        return nil
+    }
+    // 過濾 merge commit（多個 parent）
+    if c.NumParents() > 1 {
+        skipped = append(skipped, ...)
+        return nil
+    }
+    // 處理 commit...
+    return nil
+})
+```
+
+### 注意事項
+- go-git LogOptions 沒有內建 date/author filter，需在 ForEach 中手動過濾
+- 使用 `git.LogOrderCommitterTime` 確保按時間排序
+- 指定 branch 需先 resolve reference：`repo.Reference(plumbing.NewBranchReferenceName(branch), true)`
+
+### 參考資料
+- [go-git GitHub](https://github.com/go-git/go-git)
+- [go-git v5 Package Documentation](https://pkg.go.dev/github.com/go-git/go-git/v5)
+- [Git Book: Embedding Git - go-git](https://git-scm.com/book/en/v2/Appendix-B:-Embedding-Git-in-your-Applications-go-git)
+
+---
+
+## 18. Google Calendar API Go Client
+
+### 決策
+選擇 **google.golang.org/api/calendar/v3**（Google 官方 Go client）
+
+### 理由
+1. **Google 官方維護**：googleapis/google-api-go-client 是 Google 官方的 Go API client，穩定可靠
+2. **功能完整**：Events.List 支援 timeMin/timeMax/calendarId 等所有 F-009 需要的過濾參數
+3. **與 OAuth2 無縫整合**：搭配 golang.org/x/oauth2 使用，token 管理自動化
+4. **型別安全**：Event struct 直接對應 Calendar API 的 JSON schema
+
+### 使用方式
+
+```go
+import (
+    "google.golang.org/api/calendar/v3"
+    "google.golang.org/api/option"
+)
+
+// 使用 OAuth2 token 建立 Calendar service
+srv, err := calendar.NewService(ctx, option.WithHTTPClient(oauthClient))
+
+// 列出事件
+events, err := srv.Events.List(calendarID).
+    TimeMin(since.Format(time.RFC3339)).
+    TimeMax(until.Format(time.RFC3339)).
+    SingleEvents(true).         // 展開 recurring events
+    OrderBy("startTime").
+    MaxResults(500).
+    Do()
+```
+
+### 參考資料
+- [Google Calendar API Go Package](https://pkg.go.dev/google.golang.org/api/calendar/v3)
+- [Google Calendar API Quickstart for Go](https://developers.google.com/workspace/calendar/api/quickstart/go)
+- [googleapis/google-api-go-client GitHub](https://github.com/googleapis/google-api-go-client)
+
+---
+
+## 19. Google OAuth2 in Go
+
+### 決策
+使用 **golang.org/x/oauth2** + **golang.org/x/oauth2/google**（Go 官方 OAuth2 擴展庫）
+
+### 理由
+1. **Go 官方擴展庫**：golang.org/x/oauth2 是 Go 官方的 OAuth2 實作，持續維護
+2. **Google endpoint 內建**：`google.Endpoint` 預設提供 Google OAuth2 的 auth/token URL
+3. **Token 自動 refresh**：oauth2.Config.Client() 返回的 HTTP client 自動在 access_token 過期時使用 refresh_token 更新
+4. **與 Calendar API 無縫整合**：產生的 oauth2.Token 直接用於建立 Calendar service
+
+### OAuth2 Flow 設計
+
+```
+使用者                  aibo API                    Google
+  |                       |                          |
+  |-- POST /gcal/auth --> |                          |
+  |                       |-- 產生 auth_url -------->|
+  |<- { auth_url } -------|                          |
+  |                                                  |
+  |-- 瀏覽器開啟 auth_url ----->                     |
+  |                              <-- 授權同意 ------->|
+  |                              <-- redirect callback|
+  |                       |                          |
+  |    GET /gcal/callback?code=xxx&state=yyy         |
+  |                       |-- exchange code --------->|
+  |                       |<- access + refresh token -|
+  |                       |-- 加密儲存 token          |
+  |<- { connected } ------|                          |
+```
+
+### 實作要點
+
+```go
+import (
+    "golang.org/x/oauth2"
+    "golang.org/x/oauth2/google"
+)
+
+oauthConfig := &oauth2.Config{
+    ClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+    ClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+    RedirectURL:  "http://localhost:8080/api/v1/integrations/gcal/callback",
+    Scopes:       []string{calendar.CalendarReadonlyScope},
+    Endpoint:     google.Endpoint,
+}
+
+// 產生授權 URL（含 state 防 CSRF）
+state := generateRandomState()
+authURL := oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
+
+// Callback 中交換 token
+token, err := oauthConfig.Exchange(ctx, code)
+// token.AccessToken, token.RefreshToken, token.Expiry
+
+// 使用 token 建立 HTTP client（自動 refresh）
+client := oauthConfig.Client(ctx, token)
+```
+
+### 安全考量
+1. **State 參數**：使用 crypto/rand 產生隨機 state，存入記憶體（或 DB），callback 時驗證防止 CSRF
+2. **Token 加密儲存**：access_token 和 refresh_token 使用既有的 AES-256-GCM 加密後存入 DB
+3. **Scope 最小化**：只請求 `calendar.CalendarReadonlyScope`（唯讀），不請求寫入權限
+4. **AccessTypeOffline**：確保取得 refresh_token，支援長期使用
+
+### 參考資料
+- [golang.org/x/oauth2 Package](https://pkg.go.dev/golang.org/x/oauth2)
+- [golang.org/x/oauth2/google Package](https://pkg.go.dev/golang.org/x/oauth2/google)
+- [OAuth 2.0 Implementation in Golang](https://dev.to/siddheshk02/oauth-20-implementation-in-golang-3mj1)
+- [Google OAuth2 Authentication in Golang](https://www.loginradius.com/blog/engineering/google-authentication-with-golang-and-goth/)
+
+---
+
+## 20. Sprint 3 新增依賴
+
+| 用途 | Package | 選擇理由 |
+|------|---------|---------|
+| Git 操作 | github.com/go-git/go-git/v5 | 純 Go 實作、無需系統 git binary、API 直接存取 commit object |
+| Google Calendar API | google.golang.org/api/calendar/v3 | Google 官方 Go client、型別安全 |
+| Google OAuth2 | golang.org/x/oauth2 + golang.org/x/oauth2/google | Go 官方擴展庫、自動 token refresh |
+
+Sprint 3 新增 3 個依賴（go-git、google-api-go-client、oauth2）。
+
+---
+
+## 21. Sprint 3 技術風險與緩解
+
+| 風險 | 影響 | 緩解措施 |
+|------|------|---------|
+| go-git 開啟大型 repo 記憶體使用高 | 匯入大型 repo 時 OOM | 500 commits 上限 + 日期範圍過濾減少遍歷量 |
+| Google OAuth callback URL 設定錯誤 | 授權流程失敗 | 從環境變數讀取 redirect URL、文件說明 Google Console 設定步驟 |
+| Google API quota 限制 | Calendar 事件列表被拒 | 單次最多 500 events、使用 singleEvents=true 避免重複請求 |
+| Refresh token 過期或被撤銷 | 匯入失敗 | GCAL_TOKEN_EXPIRED 錯誤碼引導使用者重新授權 |
+| Docker 容器內無法存取宿主機 Git repo | F-008 功能受限 | 文件說明需掛載 volume、或使用 host network |
