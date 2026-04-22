@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -29,6 +30,15 @@ func (h *SearchHandler) SmartSearch(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Code:    model.ErrCodeInvalidInput,
 			Message: "請求格式錯誤: " + err.Error(),
+		})
+		return
+	}
+
+	// 驗證 query 非空（trim 後）
+	if strings.TrimSpace(req.Query) == "" {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Code:    model.ErrCodeInvalidInput,
+			Message: "query 不可為空",
 		})
 		return
 	}
@@ -79,17 +89,13 @@ func (h *SearchHandler) SmartSearch(c *gin.Context) {
 		if tags == nil {
 			tags = []string{}
 		}
-		matchedKW := r.MatchedKeywords
-		if matchedKW == nil {
-			matchedKW = []string{}
-		}
 		items = append(items, dto.SearchResultItem{
 			EntryID:         r.EntryID,
 			Title:           r.Title,
 			ContentPreview:  r.ContentPreview,
 			Tags:            tags,
 			Relevance:       r.Relevance,
-			MatchedKeywords: matchedKW,
+			MatchedKeywords: r.MatchedKeywords,
 		})
 	}
 
@@ -109,7 +115,7 @@ func (h *SearchHandler) SmartSearch(c *gin.Context) {
 // SimpleSearch 簡單搜尋
 // GET /api/v1/search/simple
 func (h *SearchHandler) SimpleSearch(c *gin.Context) {
-	q := c.Query("q")
+	q := strings.TrimSpace(c.Query("q"))
 	if q == "" {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Code:    model.ErrCodeInvalidInput,

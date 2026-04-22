@@ -9,6 +9,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// escapeLikePattern 對 LIKE/ILIKE 的特殊字元做 escape
+func escapeLikePattern(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "%", "\\%")
+	s = strings.ReplaceAll(s, "_", "\\_")
+	return s
+}
+
 // SearchResult 搜尋結果（從 DB 回傳）
 type SearchResult struct {
 	EntryID        uuid.UUID
@@ -55,6 +63,7 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 	keywordArgIndices := []int{}
 	for _, kw := range params.Keywords {
 		kwIdx := argIdx
+		escapedKwIdx := argIdx + 1
 		keywordArgIndices = append(keywordArgIndices, kwIdx)
 		searchConditions = append(searchConditions, fmt.Sprintf(
 			`((setweight(to_tsvector('simple', coalesce(e.title, '')), 'A') ||
@@ -62,11 +71,11 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'))
 			  @@ plainto_tsquery('simple', $%d)
 			 OR (coalesce(e.title,'') || ' ' || coalesce(e.content,'')) %% $%d
-			 OR EXISTS (SELECT 1 FROM unnest(e.tags) AS t WHERE t ILIKE '%%' || $%d || '%%'))`,
-			kwIdx, kwIdx, kwIdx,
+			 OR EXISTS (SELECT 1 FROM unnest(e.tags) AS t WHERE t ILIKE '%%' || $%d || '%%' ESCAPE '\\'))`,
+			kwIdx, kwIdx, escapedKwIdx,
 		))
-		args = append(args, kw)
-		argIdx++
+		args = append(args, kw, escapeLikePattern(kw))
+		argIdx += 2
 	}
 	conditions = append(conditions, "("+strings.Join(searchConditions, " OR ")+")")
 
