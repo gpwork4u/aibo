@@ -21,3 +21,17 @@ func (r *CreateApiKeyRequest) ParseExpiresAt() (*time.Time, error) {
 
 	return &t, nil
 }
+
+// CreateCategoryRequest 建立分類的請求
+type CreateCategoryRequest struct {
+	Name        string  `json:"name" binding:"required"`
+	Description *string `json:"description"`
+	SortOrder   *int    `json:"sort_order"`
+}
+
+// UpdateCategoryRequest 更新分類的請求（全量更新）
+type UpdateCategoryRequest struct {
+	Name        string  `json:"name" binding:"required"`
+	Description *string `json:"description"`
+	SortOrder   int     `json:"sort_order"`
+}

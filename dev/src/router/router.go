@@ -10,7 +10,7 @@ import (
 )
 
 // Setup 設定路由
-func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler) *gin.Engine {
+func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler) *gin.Engine {
 	r := gin.Default()
 
 	// 健康檢查（不需認證）
@@ -28,6 +28,16 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 			auth.POST("/api-keys", apiKeyHandler.Create)
 			auth.GET("/api-keys", apiKeyHandler.List)
 			auth.DELETE("/api-keys/:id", apiKeyHandler.Delete)
+		}
+
+		// 分類管理
+		categories := v1.Group("/categories")
+		{
+			categories.POST("", categoryHandler.Create)
+			categories.GET("", categoryHandler.List)
+			categories.GET("/:id", categoryHandler.GetByID)
+			categories.PUT("/:id", categoryHandler.Update)
+			categories.DELETE("/:id", categoryHandler.Delete)
 		}
 	}
 

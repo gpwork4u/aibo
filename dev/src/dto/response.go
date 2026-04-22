@@ -37,3 +37,29 @@ type ErrorResponse struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
+
+// CategoryResponse 建立分類的回應
+type CategoryResponse struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description"`
+	SortOrder   int       `json:"sort_order"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// CategoryItemResponse 分類列表項目（含 entry_count）
+type CategoryItemResponse struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description"`
+	SortOrder   int       `json:"sort_order"`
+	EntryCount  int       `json:"entry_count"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// ListCategoriesResponse 列出所有分類的回應
+type ListCategoriesResponse struct {
+	Data []CategoryItemResponse `json:"data"`
+}
