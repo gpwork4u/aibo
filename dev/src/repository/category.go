@@ -66,7 +66,46 @@ func (r *CategoryRepository) FindByID(ctx context.Context, id uuid.UUID) (*model
 }
 
 // List 列出所有分類（含 entry_count，按 sort_order ASC, name ASC 排序）
+// 使用 LEFT JOIN 避免 N+1 查詢，若 entries 表不存在則 fallback
 func (r *CategoryRepository) List(ctx context.Context) ([]model.Category, error) {
+	// 優先使用 LEFT JOIN + COUNT 單一查詢
+	rows, err := r.pool.Query(ctx,
+		`SELECT c.id, c.name, c.description, c.sort_order, c.created_at, c.updated_at,
+		        COALESCE(COUNT(e.id), 0) as entry_count
+		 FROM categories c
+		 LEFT JOIN entries e ON e.category_id = c.id
+		 GROUP BY c.id
+		 ORDER BY c.sort_order ASC, c.name ASC`,
+	)
+	if err != nil {
+		// entries 表可能尚未建立，fallback 回不含 entry_count 的查詢
+		if strings.Contains(err.Error(), "entries") {
+			return r.listWithoutEntryCount(ctx)
+		}
+		return nil, err
+	}
+	defer rows.Close()
+
+	var categories []model.Category
+	for rows.Next() {
+		var cat model.Category
+		if err := rows.Scan(
+			&cat.ID, &cat.Name, &cat.Description, &cat.SortOrder,
+			&cat.CreatedAt, &cat.UpdatedAt, &cat.EntryCount,
+		); err != nil {
+			return nil, err
+		}
+		categories = append(categories, cat)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return categories, nil
+}
+
+// listWithoutEntryCount 不含 entry_count 的 fallback 查詢
+func (r *CategoryRepository) listWithoutEntryCount(ctx context.Context) ([]model.Category, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT c.id, c.name, c.description, c.sort_order, c.created_at, c.updated_at
 		 FROM categories c
@@ -90,20 +129,6 @@ func (r *CategoryRepository) List(ctx context.Context) ([]model.Category, error)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
-	}
-
-	// 嘗試批次查詢 entry_count（entries 表可能尚未建立）
-	if len(categories) > 0 {
-		for i := range categories {
-			var count int
-			err := r.pool.QueryRow(ctx,
-				`SELECT COUNT(*) FROM entries WHERE category_id = $1`,
-				categories[i].ID,
-			).Scan(&count)
-			if err == nil {
-				categories[i].EntryCount = count
-			}
-		}
 	}
 
 	return categories, nil
@@ -130,7 +155,11 @@ func (r *CategoryRepository) Update(ctx context.Context, cat *model.Category) er
 }
 
 // Delete 刪除分類（硬刪除）
+// 刪除前將關聯 entries 的 category_id 設為 NULL（entries 表可能尚未建立，忽略錯誤）
 func (r *CategoryRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	// 將關聯 entries 的 category_id 設為 NULL（entries 表可能尚未建立）
+	_, _ = r.pool.Exec(ctx, "UPDATE entries SET category_id = NULL WHERE category_id = $1", id)
+
 	tag, err := r.pool.Exec(ctx, "DELETE FROM categories WHERE id = $1", id)
 	if err != nil {
 		return err

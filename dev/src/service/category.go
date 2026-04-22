@@ -109,7 +109,14 @@ func (s *CategoryService) Update(ctx context.Context, id uuid.UUID, name string,
 	}
 
 	// 重新查詢以取得更新後的 updated_at 和 entry_count
-	return s.repo.FindByID(ctx, id)
+	updated, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if updated == nil {
+		return nil, model.NewAppError(404, model.ErrCodeNotFound, "分類不存在")
+	}
+	return updated, nil
 }
 
 // Delete 刪除分類

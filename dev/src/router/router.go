@@ -10,11 +10,7 @@ import (
 )
 
 // Setup 設定路由
-<<<<<<< Updated upstream
-func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler) *gin.Engine {
-=======
 func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler) *gin.Engine {
->>>>>>> Stashed changes
 	r := gin.Default()
 
 	// 健康檢查（不需認證）
@@ -33,8 +29,6 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 			auth.GET("/api-keys", apiKeyHandler.List)
 			auth.DELETE("/api-keys/:id", apiKeyHandler.Delete)
 		}
-<<<<<<< Updated upstream
-=======
 
 		// 分類管理
 		categories := v1.Group("/categories")
@@ -45,7 +39,6 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 			categories.PUT("/:id", categoryHandler.Update)
 			categories.DELETE("/:id", categoryHandler.Delete)
 		}
->>>>>>> Stashed changes
 	}
 
 	return r
