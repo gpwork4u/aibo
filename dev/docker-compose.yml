@@ -22,6 +22,7 @@ services:
     environment:
       DATABASE_URL: postgres://aibo:${DB_PASSWORD:-aibo_dev_password}@db:5432/aibo?sslmode=disable
       SERVER_PORT: "8080"
+      AIBO_ENCRYPTION_KEY: ${ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
     depends_on:
       db:
         condition: service_healthy
