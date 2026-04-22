@@ -10,7 +10,7 @@ import (
 )
 
 // Setup 設定路由
-func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler) *gin.Engine {
+func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler) *gin.Engine {
 	r := gin.Default()
 
 	// 健康檢查（不需認證）
@@ -63,6 +63,13 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 			// LLM 自動分類
 			entries.POST("/:id/classify", classifyHandler.Classify)
 			entries.POST("/classify-all", classifyHandler.ClassifyAll)
+		}
+
+		// 搜尋
+		search := v1.Group("/search")
+		{
+			search.POST("", searchHandler.SmartSearch)
+			search.GET("/simple", searchHandler.SimpleSearch)
 		}
 	}
 

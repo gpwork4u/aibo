@@ -128,6 +128,108 @@ func (s *LlmService) Classify(ctx context.Context, content string, existingCateg
 	return result, nil
 }
 
+// synonymSystemPrompt 同義詞展開用的 system prompt
+const synonymSystemPrompt = `你是一個搜尋助手。根據使用者的搜尋查詢，列出相關的同義詞和替代關鍵字。
+回傳 JSON 格式：{"synonyms": ["keyword1", "keyword2", ...]}
+包含原始查詢詞、翻譯（中英互譯）、縮寫、別名。最多 10 個關鍵字。
+只回傳 JSON，不要包含任何其他文字。`
+
+// SynonymResult 同義詞展開結果
+type SynonymResult struct {
+	Synonyms []string `json:"synonyms"`
+}
+
+// ExpandSynonyms 呼叫 LLM 展開同義關鍵字
+// timeout 10 秒，失敗時回傳 nil 和 error（呼叫端自行降級）
+func (s *LlmService) ExpandSynonyms(ctx context.Context, query string) ([]string, error) {
+	// 取得可用的 provider
+	provider, err := s.providerSvc.GetActiveProvider(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("無可用的 LLM Provider: %w", err)
+	}
+
+	// 解密 api_key
+	apiKey := ""
+	if provider.ApiKey != nil && *provider.ApiKey != "" {
+		decrypted, err := s.crypto.Decrypt(*provider.ApiKey)
+		if err != nil {
+			return nil, fmt.Errorf("解密 API Key 失敗: %w", err)
+		}
+		apiKey = decrypted
+	}
+
+	// 建立 go-openai client
+	clientConfig := openai.DefaultConfig(apiKey)
+	clientConfig.BaseURL = strings.TrimRight(provider.EndpointURL, "/")
+	if !strings.HasSuffix(clientConfig.BaseURL, "/v1") {
+		clientConfig.BaseURL = clientConfig.BaseURL + "/v1"
+	}
+	client := openai.NewClientWithConfig(clientConfig)
+
+	// 設定 10 秒 timeout
+	callCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	// 等待 rate limiter
+	if err := s.limiter.Wait(callCtx); err != nil {
+		return nil, fmt.Errorf("rate limit 等待取消: %w", err)
+	}
+
+	userPrompt := fmt.Sprintf("使用者查詢：%s", query)
+
+	slog.Info("呼叫 LLM 展開同義詞",
+		"provider", provider.Name,
+		"model", provider.ModelName,
+		"query", query,
+	)
+
+	resp, err := client.CreateChatCompletion(callCtx, openai.ChatCompletionRequest{
+		Model: provider.ModelName,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleSystem, Content: synonymSystemPrompt},
+			{Role: openai.ChatMessageRoleUser, Content: userPrompt},
+		},
+		ResponseFormat: &openai.ChatCompletionResponseFormat{
+			Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+		},
+		MaxTokens: 200,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("LLM API 呼叫失敗: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("LLM 回傳空結果")
+	}
+
+	rawContent := resp.Choices[0].Message.Content
+	result, err := parseSynonymResult(rawContent)
+	if err != nil {
+		slog.Error("同義詞展開結果解析失敗", "raw", rawContent, "error", err)
+		return nil, err
+	}
+
+	// 限制最多 10 個
+	if len(result.Synonyms) > 10 {
+		result.Synonyms = result.Synonyms[:10]
+	}
+
+	slog.Info("同義詞展開完成", "query", query, "synonyms", result.Synonyms)
+	return result.Synonyms, nil
+}
+
+// parseSynonymResult 解析 LLM 回傳的同義詞 JSON
+func parseSynonymResult(raw string) (*SynonymResult, error) {
+	var result SynonymResult
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		return nil, fmt.Errorf("同義詞 JSON 解析失敗: %w", err)
+	}
+	if len(result.Synonyms) == 0 {
+		return nil, fmt.Errorf("LLM 回傳空的同義詞列表")
+	}
+	return &result, nil
+}
+
 // parseClassifyResult 解析 LLM 回傳的分類 JSON
 func parseClassifyResult(raw string) (*dto.ClassifyResult, error) {
 	var result dto.ClassifyResult

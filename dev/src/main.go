@@ -89,8 +89,13 @@ func main() {
 	entryHandler := handler.NewEntryHandler(entrySvc, classifierWorker)
 	classifyHandler := handler.NewClassifyHandler(classifierSvc, entryRepo)
 
+	// 初始化搜尋服務
+	searchRepo := repository.NewSearchRepository(pool)
+	searchSvc := service.NewSearchService(llmSvc, searchRepo)
+	searchHandler := handler.NewSearchHandler(searchSvc)
+
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
