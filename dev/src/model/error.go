@@ -4,11 +4,12 @@ import "fmt"
 
 // 錯誤碼常數
 const (
-	ErrCodeUnauthorized     = "UNAUTHORIZED"
-	ErrCodeInvalidInput     = "INVALID_INPUT"
-	ErrCodeDuplicateKeyName = "DUPLICATE_KEY_NAME"
-	ErrCodeLastKeyProtected = "LAST_KEY_PROTECTED"
-	ErrCodeNotFound         = "NOT_FOUND"
+	ErrCodeUnauthorized      = "UNAUTHORIZED"
+	ErrCodeInvalidInput      = "INVALID_INPUT"
+	ErrCodeDuplicateKeyName  = "DUPLICATE_KEY_NAME"
+	ErrCodeLastKeyProtected  = "LAST_KEY_PROTECTED"
+	ErrCodeNotFound          = "NOT_FOUND"
+	ErrCodeDuplicateCategory = "DUPLICATE_CATEGORY"
 )
 
 // AppError 應用程式錯誤

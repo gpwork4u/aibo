@@ -60,8 +60,17 @@ func main() {
 	apiKeySvc := service.NewApiKeyService(apiKeyRepo)
 	apiKeyHandler := handler.NewApiKeyHandler(apiKeySvc)
 
+<<<<<<< Updated upstream
 	// 設定路由
 	r := router.Setup(apiKeySvc, apiKeyHandler)
+=======
+	categoryRepo := repository.NewCategoryRepository(pool)
+	categorySvc := service.NewCategoryService(categoryRepo)
+	categoryHandler := handler.NewCategoryHandler(categorySvc)
+
+	// 設定路由
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler)
+>>>>>>> Stashed changes
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
