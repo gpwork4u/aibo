@@ -10,6 +10,7 @@ const (
 	ErrCodeLastKeyProtected  = "LAST_KEY_PROTECTED"
 	ErrCodeNotFound          = "NOT_FOUND"
 	ErrCodeDuplicateCategory = "DUPLICATE_CATEGORY"
+	ErrCodeDuplicateProvider = "DUPLICATE_PROVIDER"
 )
 
 // AppError 應用程式錯誤

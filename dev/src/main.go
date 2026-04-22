@@ -15,6 +15,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/gpwork4u/aibo/config"
+	"github.com/gpwork4u/aibo/crypto"
 	"github.com/gpwork4u/aibo/handler"
 	"github.com/gpwork4u/aibo/repository"
 	"github.com/gpwork4u/aibo/router"
@@ -55,6 +56,14 @@ func main() {
 	}
 	slog.Info("資料庫連線成功")
 
+	// 初始化 AES 加密模組
+	aesCrypto, err := crypto.NewAESCrypto()
+	if err != nil {
+		slog.Error("初始化加密模組失敗", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("AES-256-GCM 加密模組初始化完成")
+
 	// 初始化各層
 	apiKeyRepo := repository.NewApiKeyRepository(pool)
 	apiKeySvc := service.NewApiKeyService(apiKeyRepo)
@@ -64,8 +73,12 @@ func main() {
 	categorySvc := service.NewCategoryService(categoryRepo)
 	categoryHandler := handler.NewCategoryHandler(categorySvc)
 
+	llmProviderRepo := repository.NewLlmProviderRepository(pool)
+	llmProviderSvc := service.NewLlmProviderService(llmProviderRepo, aesCrypto)
+	llmProviderHandler := handler.NewLlmProviderHandler(llmProviderSvc)
+
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
