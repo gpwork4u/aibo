@@ -79,10 +79,18 @@ func main() {
 
 	entryRepo := repository.NewEntryRepository(pool)
 	entrySvc := service.NewEntryService(entryRepo)
-	entryHandler := handler.NewEntryHandler(entrySvc)
+
+	// 初始化 LLM 分類服務
+	llmSvc := service.NewLlmService(llmProviderSvc, aesCrypto)
+	classifierSvc := service.NewClassifierService(llmSvc, entryRepo, categoryRepo)
+	classifierWorker := service.NewClassifierWorker(classifierSvc)
+	classifierWorker.Start()
+
+	entryHandler := handler.NewEntryHandler(entrySvc, classifierWorker)
+	classifyHandler := handler.NewClassifyHandler(classifierSvc, entryRepo)
 
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
@@ -103,6 +111,9 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	slog.Info("收到關閉信號，正在優雅關閉伺服器...")
+
+	// 先關閉分類 worker（等待進行中的任務完成）
+	classifierWorker.Shutdown()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
