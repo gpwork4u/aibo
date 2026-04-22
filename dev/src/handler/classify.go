@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 
@@ -15,15 +14,17 @@ import (
 
 // ClassifyHandler 分類相關 HTTP handlers
 type ClassifyHandler struct {
-	classifierSvc *service.ClassifierService
-	entryRepo     *repository.EntryRepository
+	classifierSvc    *service.ClassifierService
+	classifierWorker *service.ClassifierWorker
+	entryRepo        *repository.EntryRepository
 }
 
 // NewClassifyHandler 建立新的 ClassifyHandler
-func NewClassifyHandler(classifierSvc *service.ClassifierService, entryRepo *repository.EntryRepository) *ClassifyHandler {
+func NewClassifyHandler(classifierSvc *service.ClassifierService, classifierWorker *service.ClassifierWorker, entryRepo *repository.EntryRepository) *ClassifyHandler {
 	return &ClassifyHandler{
-		classifierSvc: classifierSvc,
-		entryRepo:     entryRepo,
+		classifierSvc:    classifierSvc,
+		classifierWorker: classifierWorker,
+		entryRepo:        entryRepo,
 	}
 }
 
@@ -57,13 +58,8 @@ func (h *ClassifyHandler) Classify(c *gin.Context) {
 		return
 	}
 
-	// 背景 goroutine 執行分類
-	go func() {
-		bgCtx := context.Background()
-		if err := h.classifierSvc.ClassifyEntry(bgCtx, id); err != nil {
-			slog.Error("手動分類失敗", "entry_id", id, "error", err)
-		}
-	}()
+	// 透過 worker 佇列執行分類（受 Shutdown 控制）
+	h.classifierWorker.Enqueue(id)
 
 	c.JSON(http.StatusAccepted, dto.ClassifyResponse{
 		Message: "Classification started",
@@ -87,12 +83,9 @@ func (h *ClassifyHandler) ClassifyAll(c *gin.Context) {
 
 	count := len(entryIDs)
 
-	// 背景批次處理（序列執行）
-	if count > 0 {
-		go func() {
-			bgCtx := context.Background()
-			h.classifierSvc.ClassifyAllInboxAsync(bgCtx, entryIDs)
-		}()
+	// 透過 worker 佇列逐筆 enqueue（受 Shutdown 控制）
+	for _, id := range entryIDs {
+		h.classifierWorker.Enqueue(id)
 	}
 
 	c.JSON(http.StatusAccepted, dto.ClassifyAllResponse{

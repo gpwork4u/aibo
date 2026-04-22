@@ -158,7 +158,7 @@ func (s *ClassifierService) GetInboxEntryIDs(ctx context.Context) ([]uuid.UUID, 
 		filter.Page = page
 		pageResult, err := s.entryRepo.List(ctx, filter)
 		if err != nil {
-			break
+			return nil, fmt.Errorf("查詢未分類 entries 第 %d 頁失敗: %w", page, err)
 		}
 		for _, item := range pageResult.Data {
 			entryIDs = append(entryIDs, item.ID)
