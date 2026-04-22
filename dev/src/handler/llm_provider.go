@@ -115,6 +115,7 @@ func (h *LlmProviderHandler) Update(c *gin.Context) {
 		Name:        req.Name,
 		EndpointURL: req.EndpointURL,
 		ApiKey:      req.ApiKey,
+		ApiKeyOmit:  req.ApiKey == nil, // 請求中未提供 api_key 時，保留原值不更新
 		ModelName:   req.ModelName,
 		IsDefault:   req.IsDefault,
 		Config:      req.Config,

@@ -42,6 +42,26 @@ func (r *LlmProviderRepository) Create(ctx context.Context, provider *model.LlmP
 	return err
 }
 
+// CreateTx 在指定 transaction 中建立新的 LLM Provider
+func (r *LlmProviderRepository) CreateTx(ctx context.Context, tx pgx.Tx, provider *model.LlmProvider) error {
+	_, err := tx.Exec(ctx,
+		`INSERT INTO llm_providers (id, name, endpoint_url, api_key, model_name, is_default, config, is_active, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		provider.ID, provider.Name, provider.EndpointURL, provider.ApiKey,
+		provider.ModelName, provider.IsDefault, provider.Config,
+		provider.IsActive, provider.CreatedAt, provider.UpdatedAt,
+	)
+	if err != nil {
+		if strings.Contains(err.Error(), "idx_llm_providers_name_lower") {
+			return model.NewAppError(409, model.ErrCodeDuplicateProvider, "LLM Provider 名稱已存在")
+		}
+		if strings.Contains(err.Error(), "idx_llm_providers_default") {
+			return model.NewAppError(409, model.ErrCodeInvalidInput, "已有其他 default provider")
+		}
+	}
+	return err
+}
+
 // FindByID 透過 ID 查找 LLM Provider
 func (r *LlmProviderRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.LlmProvider, error) {
 	p := &model.LlmProvider{}
@@ -102,6 +122,32 @@ func (r *LlmProviderRepository) List(ctx context.Context) ([]model.LlmProvider, 
 // Update 全量更新 LLM Provider
 func (r *LlmProviderRepository) Update(ctx context.Context, provider *model.LlmProvider) error {
 	tag, err := r.pool.Exec(ctx,
+		`UPDATE llm_providers
+		 SET name = $2, endpoint_url = $3, api_key = $4, model_name = $5,
+		     is_default = $6, config = $7, is_active = $8, updated_at = $9
+		 WHERE id = $1`,
+		provider.ID, provider.Name, provider.EndpointURL, provider.ApiKey,
+		provider.ModelName, provider.IsDefault, provider.Config,
+		provider.IsActive, provider.UpdatedAt,
+	)
+	if err != nil {
+		if strings.Contains(err.Error(), "idx_llm_providers_name_lower") {
+			return model.NewAppError(409, model.ErrCodeDuplicateProvider, "LLM Provider 名稱已被其他 provider 使用")
+		}
+		if strings.Contains(err.Error(), "idx_llm_providers_default") {
+			return model.NewAppError(409, model.ErrCodeInvalidInput, "已有其他 default provider")
+		}
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return model.NewAppError(404, model.ErrCodeNotFound, "LLM Provider 不存在")
+	}
+	return nil
+}
+
+// UpdateTx 在指定 transaction 中全量更新 LLM Provider
+func (r *LlmProviderRepository) UpdateTx(ctx context.Context, tx pgx.Tx, provider *model.LlmProvider) error {
+	tag, err := tx.Exec(ctx,
 		`UPDATE llm_providers
 		 SET name = $2, endpoint_url = $3, api_key = $4, model_name = $5,
 		     is_default = $6, config = $7, is_active = $8, updated_at = $9

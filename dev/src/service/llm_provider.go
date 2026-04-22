@@ -84,7 +84,7 @@ func (s *LlmProviderService) Create(ctx context.Context, input CreateInput) (*mo
 		provider.ApiKey = &encrypted
 	}
 
-	// 如果設定為 default，先在 transaction 中清除舊 default
+	// 如果設定為 default，在同一個 transaction 中清除舊 default 並建立新 provider
 	if input.IsDefault {
 		tx, err := s.repo.BeginTx(ctx)
 		if err != nil {
@@ -96,13 +96,17 @@ func (s *LlmProviderService) Create(ctx context.Context, input CreateInput) (*mo
 			return nil, err
 		}
 
+		if err := s.repo.CreateTx(ctx, tx, provider); err != nil {
+			return nil, err
+		}
+
 		if err := tx.Commit(ctx); err != nil {
 			return nil, fmt.Errorf("提交交易失敗: %w", err)
 		}
-	}
-
-	if err := s.repo.Create(ctx, provider); err != nil {
-		return nil, err
+	} else {
+		if err := s.repo.Create(ctx, provider); err != nil {
+			return nil, err
+		}
 	}
 
 	return provider, nil
@@ -167,7 +171,7 @@ func (s *LlmProviderService) Update(ctx context.Context, id uuid.UUID, input Upd
 	}
 	// else: api_key = nil，表示清除
 
-	// 如果設定為 default 且不是原本就是 default，先清除舊 default
+	// 如果設定為 default 且不是原本就是 default，在同一個 transaction 中清除舊 default 並更新
 	if input.IsDefault && !existing.IsDefault {
 		tx, err := s.repo.BeginTx(ctx)
 		if err != nil {
@@ -179,13 +183,17 @@ func (s *LlmProviderService) Update(ctx context.Context, id uuid.UUID, input Upd
 			return nil, err
 		}
 
+		if err := s.repo.UpdateTx(ctx, tx, provider); err != nil {
+			return nil, err
+		}
+
 		if err := tx.Commit(ctx); err != nil {
 			return nil, fmt.Errorf("提交交易失敗: %w", err)
 		}
-	}
-
-	if err := s.repo.Update(ctx, provider); err != nil {
-		return nil, err
+	} else {
+		if err := s.repo.Update(ctx, provider); err != nil {
+			return nil, err
+		}
 	}
 
 	// 重新取得更新後的資料
@@ -267,6 +275,11 @@ func (s *LlmProviderService) HealthCheck(ctx context.Context, id uuid.UUID) (*He
 	// 讀取 response body（限制大小）
 	io.ReadAll(io.LimitReader(resp.Body, 1024))
 
+	// 200~499 皆視為 healthy：
+	// - 2xx/3xx：正常回應，服務運作中
+	// - 4xx（含 401 Unauthorized、403 Forbidden）：能成功連線到 endpoint，
+	//   代表服務本身存活可達，僅是認證/授權或請求參數問題，不影響 provider 的可用性判定。
+	// - 5xx：伺服器端錯誤，才視為 unhealthy。
 	if resp.StatusCode >= 200 && resp.StatusCode < 500 {
 		return &HealthCheckResult{Status: "healthy", ResponseTimeMs: &elapsed}, nil
 	}
