@@ -1,0 +1,13 @@
+# 環境變數
+.env
+
+# Go binary
+src/aibo
+src/api-server
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
