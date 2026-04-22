@@ -77,8 +77,12 @@ func main() {
 	llmProviderSvc := service.NewLlmProviderService(llmProviderRepo, aesCrypto)
 	llmProviderHandler := handler.NewLlmProviderHandler(llmProviderSvc)
 
+	entryRepo := repository.NewEntryRepository(pool)
+	entrySvc := service.NewEntryService(entryRepo)
+	entryHandler := handler.NewEntryHandler(entrySvc)
+
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{

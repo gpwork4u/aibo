@@ -10,7 +10,7 @@ import (
 )
 
 // Setup 設定路由
-func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler) *gin.Engine {
+func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler) *gin.Engine {
 	r := gin.Default()
 
 	// 健康檢查（不需認證）
@@ -49,6 +49,16 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 			llmProviders.PUT("/:id", llmProviderHandler.Update)
 			llmProviders.DELETE("/:id", llmProviderHandler.Delete)
 			llmProviders.POST("/:id/health", llmProviderHandler.HealthCheck)
+		}
+
+		// 知識條目管理
+		entries := v1.Group("/entries")
+		{
+			entries.POST("", entryHandler.Create)
+			entries.GET("", entryHandler.List)
+			entries.GET("/:id", entryHandler.GetByID)
+			entries.PATCH("/:id", entryHandler.Update)
+			entries.DELETE("/:id", entryHandler.Delete)
 		}
 	}
 
