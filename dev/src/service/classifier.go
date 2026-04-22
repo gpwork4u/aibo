@@ -14,8 +14,8 @@ import (
 
 // ClassifierService 自動分類業務邏輯
 type ClassifierService struct {
-	llmSvc       *LlmService
-	entryRepo    *repository.EntryRepository
+	llmSvc      *LlmService
+	entryRepo   *repository.EntryRepository
 	categoryRepo *repository.CategoryRepository
 }
 
@@ -26,8 +26,8 @@ func NewClassifierService(
 	categoryRepo *repository.CategoryRepository,
 ) *ClassifierService {
 	return &ClassifierService{
-		llmSvc:       llmSvc,
-		entryRepo:    entryRepo,
+		llmSvc:      llmSvc,
+		entryRepo:   entryRepo,
 		categoryRepo: categoryRepo,
 	}
 }
@@ -170,6 +170,7 @@ func (s *ClassifierService) GetInboxEntryIDs(ctx context.Context) ([]uuid.UUID, 
 
 // matchOrCreateCategory 比對或建立分類
 func (s *ClassifierService) matchOrCreateCategory(ctx context.Context, categoryName string, existingCategories []model.Category) (uuid.UUID, error) {
+	// LOWER(TRIM()) case-insensitive 比對
 	normalizedName := strings.ToLower(strings.TrimSpace(categoryName))
 
 	for _, cat := range existingCategories {
@@ -190,8 +191,9 @@ func (s *ClassifierService) matchOrCreateCategory(ctx context.Context, categoryN
 	}
 
 	if err := s.categoryRepo.Create(ctx, newCat); err != nil {
-		// race condition 處理：重新查詢
+		// 如果同時有其他 goroutine 建立了相同名稱的 category（race condition），重新查詢
 		if strings.Contains(err.Error(), "DUPLICATE_CATEGORY") || strings.Contains(err.Error(), "idx_categories_name_lower") {
+			// 重新取得分類列表
 			cats, listErr := s.categoryRepo.List(ctx)
 			if listErr != nil {
 				return uuid.Nil, fmt.Errorf("重新查詢分類列表失敗: %w", listErr)
@@ -208,7 +210,7 @@ func (s *ClassifierService) matchOrCreateCategory(ctx context.Context, categoryN
 	return newCat.ID, nil
 }
 
-// mergeTags 合併 tags（union，去重，保留順序）
+// mergeTags 合併 tags（union，去重）
 func mergeTags(existing, newTags []string) []string {
 	tagSet := make(map[string]bool)
 	for _, t := range existing {
@@ -219,12 +221,14 @@ func mergeTags(existing, newTags []string) []string {
 	}
 
 	result := make([]string, 0, len(tagSet))
+	// 先保留原有順序
 	for _, t := range existing {
 		if tagSet[t] {
 			result = append(result, t)
 			delete(tagSet, t)
 		}
 	}
+	// 再加入新的
 	for _, t := range newTags {
 		if tagSet[t] {
 			result = append(result, t)

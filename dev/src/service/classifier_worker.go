@@ -48,6 +48,7 @@ func (w *ClassifierWorker) Start() {
 						"entry_id", entryID,
 						"error", err,
 					)
+					// 失敗時 entry 保持原狀
 				} else {
 					slog.Info("背景分類完成", "entry_id", entryID)
 				}
