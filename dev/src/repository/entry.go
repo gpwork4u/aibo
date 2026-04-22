@@ -101,11 +101,17 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 	}
 
 	// 全文搜尋
-	searchCondition := ""
+	hasSearch := false
+	searchArgIdx := 0
 	if filter.Search != "" {
-		// tsvector 全文搜尋 + pg_trgm 模糊搜尋
-		searchCondition = fmt.Sprintf(
-			`(to_tsvector('simple', coalesce(e.title,'') || ' ' || coalesce(e.content,'')) @@ plainto_tsquery('simple', $%d)
+		hasSearch = true
+		searchArgIdx = argIdx
+		// 加權 tsvector 全文搜尋 + pg_trgm 模糊搜尋 + tag ILIKE
+		searchCondition := fmt.Sprintf(
+			`((setweight(to_tsvector('simple', coalesce(e.title, '')), 'A') ||
+			   setweight(to_tsvector('simple', coalesce(array_to_string(e.tags, ' '), '')), 'A') ||
+			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'))
+			  @@ plainto_tsquery('simple', $%d)
 			 OR (coalesce(e.title,'') || ' ' || coalesce(e.content,'')) %% $%d
 			 OR EXISTS (SELECT 1 FROM unnest(e.tags) AS t WHERE t ILIKE '%%' || $%d || '%%'))`,
 			argIdx, argIdx, argIdx,
@@ -121,19 +127,31 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	// 排序
-	sortColumn := "e.created_at"
-	switch filter.Sort {
-	case "title":
-		sortColumn = "e.title"
-	case "updated_at":
-		sortColumn = "e.updated_at"
-	case "created_at":
-		sortColumn = "e.created_at"
-	}
-	orderDir := "DESC"
-	if filter.Order == "asc" {
-		orderDir = "ASC"
+	// 排序（搜尋時以 ts_rank 為主排序，覆蓋 sort 參數）
+	var orderClause string
+	if hasSearch {
+		orderClause = fmt.Sprintf(
+			`ts_rank(
+			   setweight(to_tsvector('simple', coalesce(e.title, '')), 'A') ||
+			   setweight(to_tsvector('simple', coalesce(array_to_string(e.tags, ' '), '')), 'A') ||
+			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'),
+			   plainto_tsquery('simple', $%d)
+			 ) DESC, e.created_at DESC`, searchArgIdx)
+	} else {
+		sortColumn := "e.created_at"
+		switch filter.Sort {
+		case "title":
+			sortColumn = "e.title"
+		case "updated_at":
+			sortColumn = "e.updated_at"
+		case "created_at":
+			sortColumn = "e.created_at"
+		}
+		orderDir := "DESC"
+		if filter.Order == "asc" {
+			orderDir = "ASC"
+		}
+		orderClause = fmt.Sprintf("%s %s", sortColumn, orderDir)
 	}
 
 	// 計算 total
@@ -151,15 +169,15 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 		totalPages = (total + filter.PerPage - 1) / filter.PerPage
 	}
 
-	// 查詢資料（content_preview 用 LEFT(content, 200)）
+	// 查詢資料（content_preview 用 LEFT(content, 200)，列表不含 source/source_type/source_ref）
 	dataQuery := fmt.Sprintf(
 		`SELECT e.id, e.title, LEFT(e.content, 200) AS content_preview, e.category_id,
-		        e.source, e.source_type, e.source_ref, e.tags, e.is_archived, e.created_at, e.updated_at
+		        e.tags, e.is_archived, e.created_at, e.updated_at
 		 FROM entries e
 		 %s
-		 ORDER BY %s %s
+		 ORDER BY %s
 		 LIMIT $%d OFFSET $%d`,
-		whereClause, sortColumn, orderDir, argIdx, argIdx+1,
+		whereClause, orderClause, argIdx, argIdx+1,
 	)
 	args = append(args, filter.PerPage, offset)
 
@@ -174,7 +192,6 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 		var item model.EntryListItem
 		if err := rows.Scan(
 			&item.ID, &item.Title, &item.ContentPreview, &item.CategoryID,
-			&item.Source, &item.SourceType, &item.SourceRef,
 			&item.Tags, &item.IsArchived, &item.CreatedAt, &item.UpdatedAt,
 		); err != nil {
 			return nil, err

@@ -71,10 +71,10 @@ func (h *EntryHandler) List(c *gin.Context) {
 
 	if perPageStr := c.Query("per_page"); perPageStr != "" {
 		perPage, err := strconv.Atoi(perPageStr)
-		if err != nil || perPage < 1 {
+		if err != nil || perPage < 1 || perPage > 100 {
 			c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 				Code:    model.ErrCodeInvalidInput,
-				Message: "per_page 必須為正整數",
+				Message: "per_page 必須為 1-100 的整數",
 			})
 			return
 		}
@@ -127,9 +127,6 @@ func (h *EntryHandler) List(c *gin.Context) {
 			Title:          item.Title,
 			ContentPreview: item.ContentPreview,
 			CategoryID:     item.CategoryID,
-			Source:         item.Source,
-			SourceType:     item.SourceType,
-			SourceRef:      item.SourceRef,
 			Tags:           tags,
 			IsArchived:     item.IsArchived,
 			CreatedAt:      item.CreatedAt,

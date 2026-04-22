@@ -50,15 +50,12 @@ type EntryResponse struct {
 	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
-// EntryListItemResponse 列表中的知識條目（content_preview）
+// EntryListItemResponse 列表中的知識條目（content_preview，不含 source 欄位）
 type EntryListItemResponse struct {
 	ID             uuid.UUID  `json:"id"`
 	Title          *string    `json:"title"`
 	ContentPreview *string    `json:"content_preview"`
 	CategoryID     *uuid.UUID `json:"category_id"`
-	Source         *string    `json:"source"`
-	SourceType     *string    `json:"source_type"`
-	SourceRef      *string    `json:"source_ref"`
 	Tags           []string   `json:"tags"`
 	IsArchived     bool       `json:"is_archived"`
 	CreatedAt      time.Time  `json:"created_at"`

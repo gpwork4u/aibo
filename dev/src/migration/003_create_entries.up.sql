@@ -23,8 +23,12 @@ CREATE UNIQUE INDEX idx_entries_source ON entries (source_type, source_ref) WHER
 -- Tags GIN 索引（支援 @> 運算子）
 CREATE INDEX idx_entries_tags ON entries USING GIN (tags);
 
--- 全文搜尋 GIN 索引
-CREATE INDEX idx_entries_fts ON entries USING GIN (to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(content,'')));
+-- 全文搜尋 GIN 索引（加權：title(A) = tags(A) > content(B)）
+CREATE INDEX idx_entries_fts ON entries USING GIN (
+  (setweight(to_tsvector('simple', coalesce(title, '')), 'A') ||
+   setweight(to_tsvector('simple', coalesce(array_to_string(tags, ' '), '')), 'A') ||
+   setweight(to_tsvector('simple', coalesce(content, '')), 'B'))
+);
 
 -- pg_trgm 模糊搜尋索引（支援中文）
 CREATE INDEX idx_entries_trgm ON entries USING GIN ((coalesce(title,'') || ' ' || coalesce(content,'')) gin_trgm_ops);
