@@ -87,7 +87,7 @@ func main() {
 	classifierWorker.Start()
 
 	entryHandler := handler.NewEntryHandler(entrySvc, classifierWorker)
-	classifyHandler := handler.NewClassifyHandler(classifierSvc, entryRepo)
+	classifyHandler := handler.NewClassifyHandler(classifierSvc, classifierWorker, entryRepo)
 
 	// 初始化搜尋服務
 	searchRepo := repository.NewSearchRepository(pool)
