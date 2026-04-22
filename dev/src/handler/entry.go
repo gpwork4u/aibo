@@ -15,12 +15,13 @@ import (
 
 // EntryHandler 知識條目 HTTP handlers
 type EntryHandler struct {
-	svc *service.EntryService
+	svc              *service.EntryService
+	classifierWorker *service.ClassifierWorker
 }
 
 // NewEntryHandler 建立新的 EntryHandler
-func NewEntryHandler(svc *service.EntryService) *EntryHandler {
-	return &EntryHandler{svc: svc}
+func NewEntryHandler(svc *service.EntryService, classifierWorker *service.ClassifierWorker) *EntryHandler {
+	return &EntryHandler{svc: svc, classifierWorker: classifierWorker}
 }
 
 // Create 建立新知識條目
@@ -44,6 +45,11 @@ func (h *EntryHandler) Create(c *gin.Context) {
 	if err != nil {
 		handleEntryError(c, err)
 		return
+	}
+
+	// 建立成功後，如果沒有指定 category，觸發背景 LLM 自動分類
+	if entry.CategoryID == nil && h.classifierWorker != nil {
+		h.classifierWorker.Enqueue(entry.ID)
 	}
 
 	c.JSON(http.StatusCreated, toEntryResponse(entry))
