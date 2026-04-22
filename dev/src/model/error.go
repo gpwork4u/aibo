@@ -11,6 +11,8 @@ const (
 	ErrCodeNotFound          = "NOT_FOUND"
 	ErrCodeDuplicateCategory = "DUPLICATE_CATEGORY"
 	ErrCodeDuplicateProvider = "DUPLICATE_PROVIDER"
+	ErrCodeCategoryNotFound  = "CATEGORY_NOT_FOUND"
+	ErrCodeDuplicateSource   = "DUPLICATE_SOURCE"
 )
 
 // AppError 應用程式錯誤
