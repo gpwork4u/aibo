@@ -91,3 +91,91 @@ F-010 -> F-004 -> F-001 -> F-002
 | F-010 延遲 | 所有後續 feature 阻塞 | 最高優先級，先完成 middleware |
 | 全文搜尋 index 設定 | F-001 完成時間 | 可先完成 CRUD，搜尋 index 後補 |
 | AES 加密實作 | F-007 完成時間 | crypto 模組獨立開發，不阻塞其他 |
+
+---
+
+# Sprint 2 依賴圖譜
+
+## 功能總覽
+
+| 編號 | 名稱 | 優先級 | 工作量 |
+|------|------|--------|-------|
+| F-003 | LLM 自動分類 | P0 | 大 |
+| F-005 | LLM 同義關鍵字搜尋 | P0 | 中 |
+
+## 依賴關係
+
+```
+Sprint 1 已完成基礎設施
+├── Entry CRUD（F-001）
+├── Category CRUD（F-004）
+├── LLM Provider 管理（F-007）
+└── API Key 認證（F-010）
+
+Sprint 2 新功能
+├── F-003 LLM 自動分類
+│   ├── 依賴 Entry CRUD（讀取/更新 entry）
+│   ├── 依賴 Category CRUD（查詢/建立 category）
+│   ├── 依賴 LLM Provider（取得 active provider、解密 API Key）
+│   └── 新增 LLM Client 模組（go-openai）
+│
+└── F-005 LLM 同義關鍵字搜尋
+    ├── 依賴 Entry Repository（全文搜尋查詢）
+    ├── 依賴 LLM Provider（取得 active provider、解密 API Key）
+    └── 共用 LLM Client 模組（與 F-003 共用）
+```
+
+## 依賴說明
+
+### Data Model 依賴
+- **F-003 -> Entry + Category**：分類結果更新 entry.category_id / tags / title，可能自動建立 category
+- **F-005 -> Entry**：搜尋 Entry 的 tsvector index，無寫入操作
+
+### 共用模組依賴
+- **F-003, F-005 -> LLM Client**：兩者都需要呼叫 LLM API，共用 LlmService（封裝 go-openai client、rate limiter）
+- **F-003, F-005 -> LLM Provider**：兩者都透過 GetActiveProvider 取得可用 provider
+
+### 互相獨立
+- **F-003 與 F-005 無直接依賴**：分類修改 entry 的 category/tags，搜尋只讀取 entry 內容，兩者可並行開發
+
+## 拓撲排序
+
+### Wave 0（共用模組，先行）
+- **LLM Client 模組**（LlmService）：封裝 go-openai client 建立、LLM 呼叫、rate limiting、錯誤處理
+  - 新增 `dev/src/service/llm.go`
+  - 新增 `dev/src/dto/llm.go`（ClassifyResult、SynonymResult 等內部 DTO）
+
+### Wave 1（Wave 0 完成後，可並行）
+- **F-003: LLM 自動分類** — 背景 worker + classify API + auto-classify on create
+- **F-005: LLM 同義關鍵字搜尋** — search API + synonym expansion + degradation
+
+### QA
+- QA 與 Wave 0 同時開始撰寫 test script
+
+## 並行策略
+
+```
+時間線 ->
+
+Wave 0:  [LLM Client 模組（LlmService）]
+         [QA 撰寫 test script ────────────────────]
+
+Wave 1:       [F-003 LLM 自動分類 ──────────────]
+              [F-005 LLM 同義關鍵字搜尋 ─────────]
+
+Code Review:            [逐 PR 審查 ──────────────]
+```
+
+## 關鍵路徑
+
+LLM Client 模組 -> F-003 / F-005（並行）
+
+由於 F-003 和 F-005 可完全並行，Sprint 2 的關鍵路徑長度 = LLM Client 模組 + max(F-003, F-005)。
+
+## 風險項目
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| LLM Client 模組延遲 | F-003 和 F-005 都阻塞 | 最高優先級完成，介面先定義好讓 F-003/F-005 可 mock 開發 |
+| LLM 回傳品質不穩定 | 分類/搜尋結果不佳 | 防禦性 parse + 降級策略 |
+| 背景 worker 穩定性 | 分類任務丟失 | channel buffer + graceful shutdown |

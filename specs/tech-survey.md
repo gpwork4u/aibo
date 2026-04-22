@@ -349,3 +349,258 @@ volumes:
 | AES 加密金鑰管理 | 金鑰洩漏 | 環境變數注入、不進 git |
 | Bootstrap 機制安全性 | 首次部署窗口 | 建立第一把 key 後立即關閉 |
 | pgx 手寫 SQL 的維護成本 | 開發速度 | 建立 repository 抽象層，統一管理 |
+
+---
+
+# Sprint 2 技術選型補充調查
+
+## 調查日期
+2026-04-22
+
+## 11. OpenAI-Compatible API Client（Golang）
+
+### 候選方案
+
+| 方案 | GitHub Stars | 版本 | Go 版本需求 | 優點 | 缺點 |
+|------|-------------|------|------------|------|------|
+| sashabaranov/go-openai | 10.6k+ | 持續更新 | Go 1.18+ | 社群最廣泛採用、支援自訂 BaseURL、API 簡潔直觀 | 非官方維護 |
+| openai/openai-go | 3.2k+ | v3.32.0 | Go 1.22+ | OpenAI 官方維護、原生 Structured Output 支援 | 仍在 beta、Go 版本需求較高、文件尚不完善 |
+
+### 決策
+選擇 **sashabaranov/go-openai**
+
+### 理由
+1. **自訂 BaseURL 支援成熟**：aibo 需要支援 LM Studio 等 OpenAI-compatible provider，go-openai 透過 `config.BaseURL` 即可切換 endpoint，已被大量社群驗證
+2. **社群採用度高**：10.6k stars，Go 生態中最廣泛使用的 OpenAI client，遇到問題容易找到解法
+3. **Go 版本相容**：專案目前使用 Go 1.23，go-openai 只需 1.18+，無相容性問題
+4. **API 設計簡潔**：`openai.DefaultConfig()` + `config.BaseURL` 即可完成設定，與現有 LlmProvider model 的 endpoint_url 直接對應
+5. **功能完整**：支援 Chat Completions、Streaming、Function Calling 等，滿足分類和搜尋需求
+
+### 使用方式
+
+```go
+import openai "github.com/sashabaranov/go-openai"
+
+// 從 LlmProvider 建立 client
+config := openai.DefaultConfig(decryptedApiKey)
+config.BaseURL = provider.EndpointURL + "/v1"  // 或直接使用 provider.EndpointURL
+client := openai.NewClientWithConfig(config)
+
+resp, err := client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
+    Model: provider.ModelName,
+    Messages: []openai.ChatCompletionMessage{
+        {Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
+        {Role: openai.ChatMessageRoleUser, Content: userPrompt},
+    },
+    ResponseFormat: &openai.ChatCompletionResponseFormat{
+        Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+    },
+})
+```
+
+### 參考資料
+- [sashabaranov/go-openai GitHub](https://github.com/sashabaranov/go-openai)
+- [openai/openai-go GitHub](https://github.com/openai/openai-go)
+- [go-openai custom BaseURL issue #266](https://github.com/sashabaranov/go-openai/issues/266)
+
+---
+
+## 12. LLM Structured Output 策略
+
+### 候選方案
+
+| 方案 | 優點 | 缺點 | 適用場景 |
+|------|------|------|---------|
+| response_format: json_object | 強制 JSON 輸出、大部分 OpenAI-compatible 支援 | 需在 prompt 中說明 schema、不保證 schema 一致 | 通用 JSON 輸出 |
+| response_format: json_schema | 嚴格 schema 驗證、保證欄位完整 | 僅 OpenAI GPT-4o+ 支援、LM Studio 不一定支援 | OpenAI 專用 |
+| Prompt engineering + JSON parse | 無 API 限制、任何 model 都支援 | 需自行驗證、可能有格式錯誤 | 廣泛相容 |
+| instructor-go | 型別安全、自動 retry | 額外依賴、學習曲線 | 複雜 schema |
+
+### 決策
+採用 **response_format: json_object + Prompt engineering + Go struct 驗證** 三層策略
+
+### 理由
+1. **相容性優先**：aibo 支援多種 OpenAI-compatible provider（LM Studio、第三方），json_schema 不一定都支援，json_object 相容性更好
+2. **防禦性設計**：即使 LLM 回傳格式不完全正確，Go 層的 json.Unmarshal + 驗證邏輯可以攔截
+3. **不引入額外依賴**：使用 Go 標準庫 encoding/json 即可，不需要 instructor-go
+
+### 實作策略
+
+```go
+// 1. Prompt 中明確要求 JSON 格式
+const classifySystemPrompt = `你是一個知識分類助手。根據提供的內容，回傳 JSON 格式：
+{"category": "分類名稱", "tags": ["tag1", "tag2"], "title": "建議標題"}
+只回傳 JSON，不要包含任何其他文字。`
+
+// 2. 使用 response_format: json_object
+ResponseFormat: &openai.ChatCompletionResponseFormat{
+    Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+},
+
+// 3. Go struct 驗證
+type ClassifyResult struct {
+    Category string   `json:"category"`
+    Tags     []string `json:"tags"`
+    Title    string   `json:"title"`
+}
+
+func parseClassifyResult(raw string) (*ClassifyResult, error) {
+    var result ClassifyResult
+    if err := json.Unmarshal([]byte(raw), &result); err != nil {
+        return nil, fmt.Errorf("LLM 回傳格式無效: %w", err)
+    }
+    if result.Category == "" {
+        return nil, fmt.Errorf("LLM 回傳缺少 category 欄位")
+    }
+    return &result, nil
+}
+```
+
+### 參考資料
+- [OpenAI Structured Outputs Guide](https://developers.openai.com/api/docs/guides/structured-outputs)
+- [Constraining LLMs with Structured Output](https://www.glukhov.org/post/2025/09/llm-structured-output-with-ollama-in-python-and-go/)
+- [instructor-go GitHub](https://github.com/jxnl/instructor-go)
+
+---
+
+## 13. 背景任務 / Goroutine 管理
+
+### 決策
+使用 **context.Context + sync.WaitGroup + channel** 原生模式
+
+### 理由
+1. **不過度設計**：aibo 是個人知識庫，背景任務只有「新 entry 建立後自動分類」和「批次分類」兩個場景，不需要完整的 job queue（如 asynq、machinery）
+2. **Go 原生工具足夠**：context 傳遞取消信號、WaitGroup 等待完成、channel 控制並發
+3. **graceful shutdown**：利用 signal.NotifyContext 監聽 SIGINT/SIGTERM，確保進行中的分類任務完成後才關閉
+
+### 架構設計
+
+```go
+// ClassificationWorker 背景分類 worker
+type ClassificationWorker struct {
+    llmService      *LlmService
+    entryService    *EntryService
+    categoryService *CategoryService
+    taskCh          chan uuid.UUID    // entry ID channel
+    wg              sync.WaitGroup
+    ctx             context.Context
+    cancel          context.CancelFunc
+}
+
+// Start 啟動背景 worker
+func (w *ClassificationWorker) Start() {
+    w.wg.Add(1)
+    go func() {
+        defer w.wg.Done()
+        for {
+            select {
+            case entryID := <-w.taskCh:
+                w.classifyEntry(w.ctx, entryID)
+            case <-w.ctx.Done():
+                return
+            }
+        }
+    }()
+}
+
+// Enqueue 將 entry 加入分類佇列（非阻塞）
+func (w *ClassificationWorker) Enqueue(entryID uuid.UUID) {
+    select {
+    case w.taskCh <- entryID:
+        slog.Info("entry enqueued for classification", "entry_id", entryID)
+    default:
+        slog.Warn("classification queue full, skipping", "entry_id", entryID)
+    }
+}
+
+// Shutdown 優雅關閉
+func (w *ClassificationWorker) Shutdown() {
+    w.cancel()
+    w.wg.Wait()
+}
+```
+
+### 關鍵設計決策
+- **Channel buffer size**：設定為 100，足夠個人使用場景的 burst
+- **單一 worker goroutine**：批次分類序列執行（spec 要求），不需要 worker pool
+- **非阻塞 enqueue**：使用 select + default 避免 channel 滿時阻塞 API handler
+- **graceful shutdown**：main.go 中監聽系統信號，呼叫 worker.Shutdown() 等待進行中任務完成
+
+### 參考資料
+- [Graceful Shutdown in Go: Patterns Every Production Service Needs (2026)](https://dev.to/young_gao/graceful-shutdown-in-go-patterns-every-production-service-needs-3l9c)
+- [A Guide to Graceful Shutdown in Go with Goroutines and Context](https://medium.com/@karthianandhanit/a-guide-to-graceful-shutdown-in-go-with-goroutines-and-context-1ebe3654cac8)
+
+---
+
+## 14. Rate Limiting（LLM API 呼叫）
+
+### 決策
+使用 **golang.org/x/time/rate** 標準庫 + 序列處理
+
+### 理由
+1. **批次分類已是序列執行**：spec 明確要求「批次分類（classify-all）序列執行，逐筆處理」，天然避免了並發過載
+2. **可配置速率**：透過 LlmProvider 的 config JSON 欄位設定 rate limit 參數
+3. **標準庫品質**：golang.org/x/time/rate 是 Go 官方擴展庫，token bucket 演算法，穩定可靠
+
+### 實作策略
+
+```go
+import "golang.org/x/time/rate"
+
+// LlmService 內建 rate limiter
+type LlmService struct {
+    providerSvc *LlmProviderService
+    crypto      *crypto.AESCrypto
+    limiter     *rate.Limiter  // 全域 rate limiter
+}
+
+func NewLlmService(providerSvc *LlmProviderService, aesCrypto *crypto.AESCrypto) *LlmService {
+    return &LlmService{
+        providerSvc: providerSvc,
+        crypto:      aesCrypto,
+        limiter:     rate.NewLimiter(rate.Every(time.Second), 5), // 每秒最多 5 個請求，可配置
+    }
+}
+
+func (s *LlmService) callLLM(ctx context.Context, ...) (...) {
+    // 等待 rate limiter 許可
+    if err := s.limiter.Wait(ctx); err != nil {
+        return nil, fmt.Errorf("rate limit wait cancelled: %w", err)
+    }
+    // 執行 LLM API 呼叫
+    ...
+}
+```
+
+### 關鍵設計決策
+- **預設速率**：每秒 5 個請求（burst = 5），適合 LM Studio 本地推理的吞吐量
+- **可配置**：未來可從 LlmProvider.Config 讀取自訂速率
+- **與序列處理互補**：batch classify 序列執行 + rate limiter 雙重保護
+
+### 參考資料
+- [golang.org/x/time/rate 官方文件](https://pkg.go.dev/golang.org/x/time/rate)
+- [Go Wiki: Rate Limiting](https://go.dev/wiki/RateLimiting)
+- [How to Rate Limit HTTP Requests in Go](https://www.alexedwards.net/blog/how-to-rate-limit-http-requests)
+
+---
+
+## 15. Sprint 2 新增依賴
+
+| 用途 | Package | 選擇理由 |
+|------|---------|---------|
+| OpenAI-compatible client | github.com/sashabaranov/go-openai | 社群最廣泛、支援自訂 BaseURL |
+| Rate limiting | golang.org/x/time/rate | Go 官方擴展庫、token bucket |
+
+Sprint 2 僅新增 2 個依賴，維持專案精簡。
+
+---
+
+## 16. Sprint 2 技術風險與緩解
+
+| 風險 | 影響 | 緩解措施 |
+|------|------|---------|
+| LM Studio 不支援 response_format: json_object | LLM 回傳非 JSON 格式 | Prompt 中強調 JSON 格式 + Go 層 parse 失敗時 entry 保持原狀 |
+| LLM 分類品質不穩定 | 分類結果不準確 | category 比對使用 case-insensitive、tags 合併而非取代 |
+| LLM 同義詞展開 timeout | 搜尋延遲或失敗 | 10 秒 timeout + 自動降級為原始 query 搜尋 |
+| 背景 goroutine 記憶體洩漏 | 服務不穩定 | context 取消 + WaitGroup + channel buffer 限制 |
+| 批次分類大量 entries 時耗時過長 | 使用者等待 | 202 非同步回應 + 序列處理 + rate limiting |
