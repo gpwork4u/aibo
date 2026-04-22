@@ -225,7 +225,8 @@ func parseSynonymResult(raw string) (*SynonymResult, error) {
 		return nil, fmt.Errorf("同義詞 JSON 解析失敗: %w", err)
 	}
 	if len(result.Synonyms) == 0 {
-		return nil, fmt.Errorf("LLM 回傳空的同義詞列表")
+		slog.Warn("LLM 判斷無同義詞，回傳空列表", "raw", raw)
+		return &result, nil
 	}
 	return &result, nil
 }
