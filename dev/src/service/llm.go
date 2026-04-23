@@ -2,12 +2,17 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/http"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	openai "github.com/sashabaranov/go-openai"
 	"golang.org/x/time/rate"
 
@@ -16,11 +21,30 @@ import (
 	"github.com/gpwork4u/aibo/model"
 )
 
+// cachedClient 快取的 openai client 與 per-provider rate limiter
+type cachedClient struct {
+	client     *openai.Client
+	limiter    *rate.Limiter
+	configHash string // sha256(endpointURL + apiKey)，用於偵測設定變更
+}
+
+// sharedTransport 所有 client 共用的 HTTP Transport，啟用連線池
+var sharedTransport = &http.Transport{
+	MaxIdleConns:        100,
+	MaxIdleConnsPerHost: 10,
+	IdleConnTimeout:     90 * time.Second,
+	DialContext: (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext,
+}
+
 // LlmService 統一的 LLM 呼叫介面
 type LlmService struct {
 	providerSvc *LlmProviderService
 	crypto      *crypto.AESCrypto
-	limiter     *rate.Limiter
+	mu          sync.RWMutex
+	clients     map[uuid.UUID]*cachedClient
 }
 
 // NewLlmService 建立新的 LlmService
@@ -28,8 +52,86 @@ func NewLlmService(providerSvc *LlmProviderService, aesCrypto *crypto.AESCrypto)
 	return &LlmService{
 		providerSvc: providerSvc,
 		crypto:      aesCrypto,
-		limiter:     rate.NewLimiter(rate.Every(time.Second), 5), // 每秒最多 5 個請求
+		clients:     make(map[uuid.UUID]*cachedClient),
 	}
+}
+
+// InvalidateClient 清除指定 provider 的快取 client
+// 當 provider 設定變更或刪除時呼叫
+func (s *LlmService) InvalidateClient(providerID uuid.UUID) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.clients, providerID)
+	slog.Info("已清除 LLM client 快取", "provider_id", providerID)
+}
+
+// getOrCreateClient 取得或建立 openai client（含 per-provider rate limiter）
+func (s *LlmService) getOrCreateClient(provider *model.LlmProvider, apiKey string) *cachedClient {
+	hash := computeConfigHash(provider.EndpointURL, apiKey)
+
+	// 先用 RLock 查快取
+	s.mu.RLock()
+	if cached, ok := s.clients[provider.ID]; ok && cached.configHash == hash {
+		s.mu.RUnlock()
+		return cached
+	}
+	s.mu.RUnlock()
+
+	// cache miss 或 config 已變更，用 Lock 建立新的
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// double-check（避免多個 goroutine 同時 miss）
+	if cached, ok := s.clients[provider.ID]; ok && cached.configHash == hash {
+		return cached
+	}
+
+	config := openai.DefaultConfig(apiKey)
+	config.BaseURL = strings.TrimRight(provider.EndpointURL, "/")
+	if !strings.HasSuffix(config.BaseURL, "/v1") {
+		config.BaseURL = config.BaseURL + "/v1"
+	}
+	config.HTTPClient = &http.Client{
+		Transport: sharedTransport,
+	}
+
+	cached := &cachedClient{
+		client:     openai.NewClientWithConfig(config),
+		limiter:    rate.NewLimiter(rate.Every(time.Second), 5), // 每個 provider 每秒最多 5 個請求
+		configHash: hash,
+	}
+	s.clients[provider.ID] = cached
+
+	slog.Info("建立新的 LLM client", "provider_id", provider.ID, "provider_name", provider.Name)
+	return cached
+}
+
+// computeConfigHash 計算 provider 設定的 hash，用於偵測變更
+func computeConfigHash(endpointURL, apiKey string) string {
+	h := sha256.Sum256([]byte(endpointURL + "|" + apiKey))
+	return fmt.Sprintf("%x", h)
+}
+
+// ClientCacheLen 回傳目前快取的 client 數量（供測試使用）
+func (s *LlmService) ClientCacheLen() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.clients)
+}
+
+// HasCachedClient 檢查指定 provider 是否有快取的 client（供測試使用）
+func (s *LlmService) HasCachedClient(providerID uuid.UUID) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.clients[providerID]
+	return ok
+}
+
+// WarmClient 預熱指定 provider 的 client 快取（供測試和外部呼叫）
+// 回傳 client 實例的指標位址字串，相同字串代表同一個 cached client
+func (s *LlmService) WarmClient(provider *model.LlmProvider, apiKey string) string {
+	c := s.getOrCreateClient(provider, apiKey)
+	return fmt.Sprintf("%p", c)
 }
 
 // classifySystemPrompt 分類用的 system prompt
@@ -79,7 +181,7 @@ func (s *LlmService) Classify(ctx context.Context, content string, existingCateg
 		return nil, fmt.Errorf("取得 LLM provider 失敗: %w", err)
 	}
 
-	// 解密 api_key
+	// 解密 api_key 並取得快取 client
 	apiKey := ""
 	if provider.ApiKey != nil && *provider.ApiKey != "" {
 		decrypted, err := s.crypto.Decrypt(*provider.ApiKey)
@@ -89,13 +191,7 @@ func (s *LlmService) Classify(ctx context.Context, content string, existingCateg
 		apiKey = decrypted
 	}
 
-	// 建立 go-openai client
-	config := openai.DefaultConfig(apiKey)
-	config.BaseURL = strings.TrimRight(provider.EndpointURL, "/")
-	if !strings.HasSuffix(config.BaseURL, "/v1") {
-		config.BaseURL = config.BaseURL + "/v1"
-	}
-	client := openai.NewClientWithConfig(config)
+	cached := s.getOrCreateClient(provider, apiKey)
 
 	// 組裝 user prompt
 	userPrompt := content
@@ -116,8 +212,8 @@ func (s *LlmService) Classify(ctx context.Context, content string, existingCateg
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	// 等待 rate limiter
-	if err := s.limiter.Wait(callCtx); err != nil {
+	// 等待 per-provider rate limiter
+	if err := cached.limiter.Wait(callCtx); err != nil {
 		return nil, fmt.Errorf("rate limit 等待取消: %w", err)
 	}
 
@@ -126,7 +222,7 @@ func (s *LlmService) Classify(ctx context.Context, content string, existingCateg
 		"model", provider.ModelName,
 	)
 
-	resp, err := client.CreateChatCompletion(callCtx, openai.ChatCompletionRequest{
+	resp, err := cached.client.CreateChatCompletion(callCtx, openai.ChatCompletionRequest{
 		Model: provider.ModelName,
 		Messages: []openai.ChatCompletionMessage{
 			{Role: openai.ChatMessageRoleSystem, Content: classifySystemPrompt},
@@ -174,7 +270,7 @@ func (s *LlmService) ExpandSynonyms(ctx context.Context, query string) ([]string
 		return nil, fmt.Errorf("無可用的 LLM Provider: %w", err)
 	}
 
-	// 解密 api_key
+	// 解密 api_key 並取得快取 client
 	apiKey := ""
 	if provider.ApiKey != nil && *provider.ApiKey != "" {
 		decrypted, err := s.crypto.Decrypt(*provider.ApiKey)
@@ -184,20 +280,14 @@ func (s *LlmService) ExpandSynonyms(ctx context.Context, query string) ([]string
 		apiKey = decrypted
 	}
 
-	// 建立 go-openai client
-	clientConfig := openai.DefaultConfig(apiKey)
-	clientConfig.BaseURL = strings.TrimRight(provider.EndpointURL, "/")
-	if !strings.HasSuffix(clientConfig.BaseURL, "/v1") {
-		clientConfig.BaseURL = clientConfig.BaseURL + "/v1"
-	}
-	client := openai.NewClientWithConfig(clientConfig)
+	cached := s.getOrCreateClient(provider, apiKey)
 
 	// 設定 10 秒 timeout
 	callCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	// 等待 rate limiter
-	if err := s.limiter.Wait(callCtx); err != nil {
+	// 等待 per-provider rate limiter
+	if err := cached.limiter.Wait(callCtx); err != nil {
 		return nil, fmt.Errorf("rate limit 等待取消: %w", err)
 	}
 
@@ -209,7 +299,7 @@ func (s *LlmService) ExpandSynonyms(ctx context.Context, query string) ([]string
 		"query", query,
 	)
 
-	resp, err := client.CreateChatCompletion(callCtx, openai.ChatCompletionRequest{
+	resp, err := cached.client.CreateChatCompletion(callCtx, openai.ChatCompletionRequest{
 		Model: provider.ModelName,
 		Messages: []openai.ChatCompletionMessage{
 			{Role: openai.ChatMessageRoleSystem, Content: synonymSystemPrompt},

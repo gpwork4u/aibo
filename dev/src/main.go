@@ -80,8 +80,9 @@ func main() {
 	entryRepo := repository.NewEntryRepository(pool)
 	entrySvc := service.NewEntryService(entryRepo)
 
-	// 初始化 LLM 分類服務
+	// 初始化 LLM 分類服務（含 client 連線池）
 	llmSvc := service.NewLlmService(llmProviderSvc, aesCrypto)
+	llmProviderSvc.SetLlmService(llmSvc) // 反向參考：provider 更新/刪除時清除 client 快取
 	classifierSvc := service.NewClassifierService(llmSvc, entryRepo, categoryRepo)
 	classifierWorker := service.NewClassifierWorker(classifierSvc)
 	classifierWorker.Start()
