@@ -29,9 +29,11 @@ func NewClient(baseURL, apiKey string) *Client {
 
 // SearchRequest 搜尋請求
 type SearchRequest struct {
-	Query      string `json:"query"`
-	CategoryID string `json:"category_id,omitempty"`
-	Limit      int    `json:"limit,omitempty"`
+	Query      string   `json:"query"`
+	CategoryID string   `json:"category_id,omitempty"`
+	Domain     string   `json:"-"` // domain 透過 query param 傳遞，不在 JSON body
+	Limit      int      `json:"limit,omitempty"`
+	Domains    []string `json:"domains,omitempty"`
 }
 
 // SearchResponse 搜尋回應
@@ -136,6 +138,10 @@ type CategoryItem struct {
 
 // Search 搜尋知識庫
 func (c *Client) Search(req SearchRequest) (*SearchResponse, error) {
+	// 如果有 domain 參數，轉為 domains 陣列
+	if req.Domain != "" && len(req.Domains) == 0 {
+		req.Domains = []string{req.Domain}
+	}
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("序列化請求失敗: %w", err)

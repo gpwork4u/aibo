@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"strings"
 
@@ -26,9 +27,11 @@ func NewSearchService(llmSvc *LlmService, searchRepo *repository.SearchRepositor
 
 // SmartSearchInput 智慧搜尋輸入
 type SmartSearchInput struct {
-	Query      string
-	CategoryID *uuid.UUID
-	Limit      int
+	Query         string
+	CategoryID    *uuid.UUID
+	Domains       []string
+	ContextFilter map[string][]string
+	Limit         int
 }
 
 // SmartSearchOutput 智慧搜尋輸出
@@ -46,6 +49,8 @@ type SearchResultOutput struct {
 	Summary         *string
 	ContentPreview  string
 	Tags            []string
+	Domains         []string
+	Context         *json.RawMessage
 	LifecycleStatus string
 	SupersededBy    *uuid.UUID
 	Relevance       float64
@@ -54,11 +59,13 @@ type SearchResultOutput struct {
 
 // SimpleSearchInput 簡單搜尋輸入
 type SimpleSearchInput struct {
-	Query      string
-	CategoryID *uuid.UUID
-	Tags       []string
-	Limit      int
-	Offset     int
+	Query         string
+	CategoryID    *uuid.UUID
+	Tags          []string
+	Domains       []string
+	ContextFilter map[string][]string
+	Limit         int
+	Offset        int
 }
 
 // SimpleSearchOutput 簡單搜尋輸出
@@ -75,6 +82,8 @@ type SimpleSearchResultOutput struct {
 	Summary         *string
 	ContentPreview  string
 	Tags            []string
+	Domains         []string
+	Context         *json.RawMessage
 	LifecycleStatus string
 	SupersededBy    *uuid.UUID
 	Relevance       float64
@@ -121,10 +130,12 @@ func (s *SearchService) SmartSearch(ctx context.Context, input SmartSearchInput)
 
 	// 執行搜尋
 	results, total, err := s.searchRepo.Search(ctx, repository.SearchParams{
-		Keywords:   keywords,
-		CategoryID: input.CategoryID,
-		Limit:      input.Limit,
-		Offset:     0,
+		Keywords:      keywords,
+		CategoryID:    input.CategoryID,
+		Domains:       input.Domains,
+		ContextFilter: input.ContextFilter,
+		Limit:         input.Limit,
+		Offset:        0,
 	})
 	if err != nil {
 		return nil, err
@@ -151,6 +162,10 @@ func (s *SearchService) SmartSearch(ctx context.Context, input SmartSearchInput)
 		if tags == nil {
 			tags = []string{}
 		}
+		domains := r.Domains
+		if domains == nil {
+			domains = []string{}
+		}
 
 		item := SearchResultOutput{
 			EntryID:         r.EntryID,
@@ -158,6 +173,8 @@ func (s *SearchService) SmartSearch(ctx context.Context, input SmartSearchInput)
 			Summary:         r.Summary,
 			ContentPreview:  preview,
 			Tags:            tags,
+			Domains:         domains,
+			Context:         r.Context,
 			LifecycleStatus: computeLifecycleStatus(r.SupersededBy, r.Confidence),
 			SupersededBy:    r.SupersededBy,
 			Relevance:       r.Relevance,
@@ -188,11 +205,13 @@ func (s *SearchService) SimpleSearch(ctx context.Context, input SimpleSearchInpu
 	}
 
 	results, total, err := s.searchRepo.Search(ctx, repository.SearchParams{
-		Keywords:   []string{input.Query},
-		CategoryID: input.CategoryID,
-		Tags:       input.Tags,
-		Limit:      input.Limit,
-		Offset:     input.Offset,
+		Keywords:      []string{input.Query},
+		CategoryID:    input.CategoryID,
+		Tags:          input.Tags,
+		Domains:       input.Domains,
+		ContextFilter: input.ContextFilter,
+		Limit:         input.Limit,
+		Offset:        input.Offset,
 	})
 	if err != nil {
 		return nil, err
@@ -214,12 +233,18 @@ func (s *SearchService) SimpleSearch(ctx context.Context, input SimpleSearchInpu
 			tags = []string{}
 		}
 
+		domains := r.Domains
+		if domains == nil {
+			domains = []string{}
+		}
 		output.Results = append(output.Results, SimpleSearchResultOutput{
 			EntryID:         r.EntryID,
 			Title:           r.Title,
 			Summary:         r.Summary,
 			ContentPreview:  preview,
 			Tags:            tags,
+			Domains:         domains,
+			Context:         r.Context,
 			LifecycleStatus: computeLifecycleStatus(r.SupersededBy, r.Confidence),
 			SupersededBy:    r.SupersededBy,
 			Relevance:       r.Relevance,

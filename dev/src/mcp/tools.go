@@ -28,6 +28,9 @@ func QueryTool() mcp.Tool {
 		mcp.WithString("category",
 			mcp.Description("限定分類名稱（可選）"),
 		),
+		mcp.WithString("domain",
+			mcp.Description("限定技術領域（可選，如 golang, postgresql, docker）"),
+		),
 		mcp.WithNumber("limit",
 			mcp.Description("回傳數量上限（預設 5，最大 20）"),
 		),
@@ -42,6 +45,7 @@ func (h *ToolHandlers) HandleQuery(ctx context.Context, req mcp.CallToolRequest)
 	}
 
 	category := mcp.ParseString(req, "category", "")
+	domain := mcp.ParseString(req, "domain", "")
 	limit := int(mcp.ParseInt64(req, "limit", 5))
 
 	if limit < 1 {
@@ -54,6 +58,7 @@ func (h *ToolHandlers) HandleQuery(ctx context.Context, req mcp.CallToolRequest)
 	searchReq := SearchRequest{
 		Query:      query,
 		CategoryID: category,
+		Domain:     domain,
 		Limit:      limit,
 	}
 

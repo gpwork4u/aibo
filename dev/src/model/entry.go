@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,8 +19,10 @@ type Entry struct {
 	Source        *string    `json:"source"`
 	SourceType    *string    `json:"source_type"`
 	SourceRef     *string    `json:"source_ref"`
-	Tags          []string   `json:"tags"`
-	IsArchived    bool       `json:"is_archived"`
+	Tags          []string         `json:"tags"`
+	Domains       []string         `json:"domains"`
+	Context       *json.RawMessage `json:"context"`
+	IsArchived    bool             `json:"is_archived"`
 	Confidence    float64    `json:"confidence"`
 	Confirmations int        `json:"confirmations"`
 	FlagsCount    int        `json:"flags_count"`
@@ -44,13 +47,15 @@ func (e *Entry) LifecycleStatus() string {
 
 // EntryListItem 列表查詢用的條目（content 改為 preview，不含 source 欄位）
 type EntryListItem struct {
-	ID             uuid.UUID  `json:"id"`
-	Title          *string    `json:"title"`
-	Summary        *string    `json:"summary"`
-	ContentPreview *string    `json:"content_preview"`
-	CategoryID     *uuid.UUID `json:"category_id"`
-	Tags           []string   `json:"tags"`
-	IsArchived     bool       `json:"is_archived"`
+	ID             uuid.UUID        `json:"id"`
+	Title          *string          `json:"title"`
+	Summary        *string          `json:"summary"`
+	ContentPreview *string          `json:"content_preview"`
+	CategoryID     *uuid.UUID       `json:"category_id"`
+	Tags           []string         `json:"tags"`
+	Domains        []string         `json:"domains"`
+	Context        *json.RawMessage `json:"context"`
+	IsArchived     bool             `json:"is_archived"`
 	Confidence     float64    `json:"confidence"`
 	Confirmations  int        `json:"confirmations"`
 	FlagsCount     int        `json:"flags_count"`
@@ -76,6 +81,8 @@ type EntryFilter struct {
 	PerPage         int
 	CategoryID      *string // "null" 表示未分類，UUID 字串表示特定分類
 	Tags            []string
+	Domains         []string            // domain 過濾（AND 邏輯）
+	ContextFilter   map[string][]string // context 子欄位過濾（如 languages=["go"]）
 	IsArchived      *bool
 	Search          string
 	Sort            string

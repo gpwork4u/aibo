@@ -76,6 +76,7 @@ func (s *ClassifierService) ClassifyEntry(ctx context.Context, entryID uuid.UUID
 		"entry_id", entryID,
 		"category", result.Category,
 		"tags", result.Tags,
+		"domains", result.Domains,
 		"title", result.Title,
 	)
 
@@ -91,6 +92,16 @@ func (s *ClassifierService) ClassifyEntry(ctx context.Context, entryID uuid.UUID
 	// tags 合併（union）
 	if len(result.Tags) > 0 {
 		entry.Tags = mergeTags(entry.Tags, result.Tags)
+	}
+
+	// domains 合併（union）
+	if len(result.Domains) > 0 {
+		entry.Domains = mergeTags(entry.Domains, result.Domains)
+	}
+
+	// context：LLM 產生時覆蓋（只在有值時覆蓋）
+	if result.Context != nil {
+		entry.Context = result.Context
 	}
 
 	// title 僅在原本為空時覆蓋
@@ -117,6 +128,7 @@ func (s *ClassifierService) ClassifyEntry(ctx context.Context, entryID uuid.UUID
 		"entry_id", entryID,
 		"category_id", categoryID,
 		"tags", entry.Tags,
+		"domains", entry.Domains,
 	)
 
 	return nil

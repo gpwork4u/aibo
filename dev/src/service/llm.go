@@ -39,6 +39,14 @@ const classifySystemPrompt = `你是一個知識分類助手。根據使用者�
 {
   "category": "分類名稱",
   "tags": ["tag1", "tag2"],
+  "domains": ["domain1", "domain2"],
+  "context": {
+    "languages": ["go", "python"],
+    "frameworks": ["gin"],
+    "pattern": "middleware",
+    "environment": "docker",
+    "use_case": "authentication"
+  },
   "title": "建議標題",
   "summary": "一句話摘要（30字以內）",
   "detail": "詳細說明（保留原始內容的關鍵資訊，100-300字）",
@@ -48,10 +56,18 @@ const classifySystemPrompt = `你是一個知識分類助手。根據使用者�
 規則：
 1. category：選擇最適合的分類名稱，簡潔明確
 2. tags：提取 2-5 個關鍵字作為標籤，使用小寫英文或中文
-3. title：根據內容產生一個簡潔的標題（不超過 50 字）
-4. summary：用一句話概括這則知識的核心觀點
-5. detail：萃取內容中的關鍵資訊、步驟或論點
-6. action：如果內容包含可操作的建議，提取為行動指引；如果是純知識性內容，寫「供參考」
+3. domains：提取 1-3 個技術領域標籤（如 golang, postgresql, docker, frontend, backend），使用小寫英文
+4. context：多維度情境標籤，只包含相關的 key：
+   - languages：程式語言（如 go, python, javascript）
+   - frameworks：框架（如 gin, fastapi, react）
+   - pattern：設計模式或架構模式（如 middleware, singleton, api-integration）
+   - environment：執行環境（如 docker, kubernetes, local）
+   - use_case：應用場景（如 authentication, logging, monitoring）
+   如果某個 key 不適用，省略該 key 即可
+5. title：根據內容產生一個簡潔的標題（不超過 50 字）
+6. summary：用一句話概括這則知識的核心觀點
+7. detail：萃取內容中的關鍵資訊、步驟或論點
+8. action：如果內容包含可操作的建議，提取為行動指引；如果是純知識性內容，寫「供參考」
 
 只回傳 JSON，不要包含任何其他文字、說明或 markdown 格式。`
 
