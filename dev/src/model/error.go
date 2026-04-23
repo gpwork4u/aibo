@@ -16,6 +16,7 @@ const (
 	ErrCodeGcalNotConnected  = "GCAL_NOT_CONNECTED"
 	ErrCodeGcalTokenExpired  = "GCAL_TOKEN_EXPIRED"
 	ErrCodeCalendarNotFound  = "CALENDAR_NOT_FOUND"
+	ErrCodeCircularSupersede = "CIRCULAR_SUPERSEDE"
 )
 
 // AppError 應用程式錯誤

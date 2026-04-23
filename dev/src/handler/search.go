@@ -95,6 +95,8 @@ func (h *SearchHandler) SmartSearch(c *gin.Context) {
 			Summary:         r.Summary,
 			ContentPreview:  r.ContentPreview,
 			Tags:            tags,
+			LifecycleStatus: r.LifecycleStatus,
+			SupersededBy:    r.SupersededBy,
 			Relevance:       r.Relevance,
 			MatchedKeywords: r.MatchedKeywords,
 		})
@@ -190,12 +192,14 @@ func (h *SearchHandler) SimpleSearch(c *gin.Context) {
 			tags = []string{}
 		}
 		items = append(items, dto.SimpleSearchResultItem{
-			EntryID:        r.EntryID,
-			Title:          r.Title,
-			Summary:        r.Summary,
-			ContentPreview: r.ContentPreview,
-			Tags:           tags,
-			Relevance:      r.Relevance,
+			EntryID:         r.EntryID,
+			Title:           r.Title,
+			Summary:         r.Summary,
+			ContentPreview:  r.ContentPreview,
+			Tags:            tags,
+			LifecycleStatus: r.LifecycleStatus,
+			SupersededBy:    r.SupersededBy,
+			Relevance:       r.Relevance,
 		})
 	}
 

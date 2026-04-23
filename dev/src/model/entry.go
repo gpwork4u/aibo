@@ -28,6 +28,20 @@ type Entry struct {
 	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
+// LifecycleStatus 計算知識條目的生命週期狀態
+// - superseded: superseded_by IS NOT NULL
+// - degraded: confidence <= 0.2 AND superseded_by IS NULL
+// - active: 其他
+func (e *Entry) LifecycleStatus() string {
+	if e.SupersededBy != nil {
+		return "superseded"
+	}
+	if e.Confidence <= 0.2 {
+		return "degraded"
+	}
+	return "active"
+}
+
 // EntryListItem 列表查詢用的條目（content 改為 preview，不含 source 欄位）
 type EntryListItem struct {
 	ID             uuid.UUID  `json:"id"`
@@ -45,16 +59,28 @@ type EntryListItem struct {
 	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
+// LifecycleStatus 計算列表條目的生命週期狀態
+func (e *EntryListItem) LifecycleStatus() string {
+	if e.SupersededBy != nil {
+		return "superseded"
+	}
+	if e.Confidence <= 0.2 {
+		return "degraded"
+	}
+	return "active"
+}
+
 // EntryFilter 列表查詢過濾條件
 type EntryFilter struct {
-	Page       int
-	PerPage    int
-	CategoryID *string // "null" 表示未分類，UUID 字串表示特定分類
-	Tags       []string
-	IsArchived *bool
-	Search     string
-	Sort       string
-	Order      string
+	Page            int
+	PerPage         int
+	CategoryID      *string // "null" 表示未分類，UUID 字串表示特定分類
+	Tags            []string
+	IsArchived      *bool
+	Search          string
+	Sort            string
+	Order           string
+	LifecycleStatus string // "active", "superseded", "degraded" 或空字串（不過濾）
 }
 
 // EntryListResult 列表查詢結果（含分頁）

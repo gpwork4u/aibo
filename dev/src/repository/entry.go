@@ -103,6 +103,18 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 		argIdx++
 	}
 
+	// lifecycle_status 過濾（計算欄位，用 SQL 條件實現）
+	if filter.LifecycleStatus != "" {
+		switch filter.LifecycleStatus {
+		case "active":
+			conditions = append(conditions, "e.superseded_by IS NULL AND e.confidence > 0.2")
+		case "superseded":
+			conditions = append(conditions, "e.superseded_by IS NOT NULL")
+		case "degraded":
+			conditions = append(conditions, "e.superseded_by IS NULL AND e.confidence <= 0.2")
+		}
+	}
+
 	// 全文搜尋
 	hasSearch := false
 	searchArgIdx := 0

@@ -110,6 +110,19 @@ func (h *EntryHandler) List(c *gin.Context) {
 		filter.IsArchived = &archived
 	}
 
+	// 解析 lifecycle_status
+	if ls := c.Query("lifecycle_status"); ls != "" {
+		validStatuses := map[string]bool{"active": true, "superseded": true, "degraded": true}
+		if !validStatuses[ls] {
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Code:    model.ErrCodeInvalidInput,
+				Message: "lifecycle_status 必須為 active、superseded 或 degraded",
+			})
+			return
+		}
+		filter.LifecycleStatus = ls
+	}
+
 	// 解析搜尋和排序
 	filter.Search = c.Query("search")
 	filter.Sort = c.Query("sort")
@@ -129,19 +142,20 @@ func (h *EntryHandler) List(c *gin.Context) {
 			tags = []string{}
 		}
 		items = append(items, dto.EntryListItemResponse{
-			ID:             item.ID,
-			Title:          item.Title,
-			Summary:        item.Summary,
-			ContentPreview: item.ContentPreview,
-			CategoryID:     item.CategoryID,
-			Tags:           tags,
-			IsArchived:     item.IsArchived,
-			Confidence:     item.Confidence,
-			Confirmations:  item.Confirmations,
-			FlagsCount:     item.FlagsCount,
-			SupersededBy:   item.SupersededBy,
-			CreatedAt:      item.CreatedAt,
-			UpdatedAt:      item.UpdatedAt,
+			ID:              item.ID,
+			Title:           item.Title,
+			Summary:         item.Summary,
+			ContentPreview:  item.ContentPreview,
+			CategoryID:      item.CategoryID,
+			Tags:            tags,
+			IsArchived:      item.IsArchived,
+			Confidence:      item.Confidence,
+			Confirmations:   item.Confirmations,
+			FlagsCount:      item.FlagsCount,
+			SupersededBy:    item.SupersededBy,
+			LifecycleStatus: item.LifecycleStatus(),
+			CreatedAt:       item.CreatedAt,
+			UpdatedAt:       item.UpdatedAt,
 		})
 	}
 
@@ -395,24 +409,25 @@ func toEntryResponse(entry *model.Entry) dto.EntryResponse {
 		tags = []string{}
 	}
 	return dto.EntryResponse{
-		ID:            entry.ID,
-		Title:         entry.Title,
-		Content:       entry.Content,
-		Summary:       entry.Summary,
-		Detail:        entry.Detail,
-		Action:        entry.Action,
-		CategoryID:    entry.CategoryID,
-		Source:        entry.Source,
-		SourceType:    entry.SourceType,
-		SourceRef:     entry.SourceRef,
-		Tags:          tags,
-		IsArchived:    entry.IsArchived,
-		Confidence:    entry.Confidence,
-		Confirmations: entry.Confirmations,
-		FlagsCount:    entry.FlagsCount,
-		SupersededBy:  entry.SupersededBy,
-		CreatedAt:     entry.CreatedAt,
-		UpdatedAt:     entry.UpdatedAt,
+		ID:              entry.ID,
+		Title:           entry.Title,
+		Content:         entry.Content,
+		Summary:         entry.Summary,
+		Detail:          entry.Detail,
+		Action:          entry.Action,
+		CategoryID:      entry.CategoryID,
+		Source:          entry.Source,
+		SourceType:      entry.SourceType,
+		SourceRef:       entry.SourceRef,
+		Tags:            tags,
+		IsArchived:      entry.IsArchived,
+		Confidence:      entry.Confidence,
+		Confirmations:   entry.Confirmations,
+		FlagsCount:      entry.FlagsCount,
+		SupersededBy:    entry.SupersededBy,
+		LifecycleStatus: entry.LifecycleStatus(),
+		CreatedAt:       entry.CreatedAt,
+		UpdatedAt:       entry.UpdatedAt,
 	}
 }
 

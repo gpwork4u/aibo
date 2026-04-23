@@ -24,6 +24,8 @@ type SearchResult struct {
 	Summary        *string
 	ContentPreview *string
 	Tags           []string
+	Confidence     float64
+	SupersededBy   *uuid.UUID
 	Relevance      float64
 }
 
@@ -128,7 +130,7 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 	// 查詢資料（relevance = ts_rank * confidence）
 	dataQuery := fmt.Sprintf(
 		`SELECT e.id, e.title, e.summary, LEFT(e.content, 200) AS content_preview,
-		        e.tags, (%s * e.confidence) AS relevance
+		        e.tags, e.confidence, e.superseded_by, (%s * e.confidence) AS relevance
 		 FROM entries e
 		 %s
 		 ORDER BY relevance DESC, e.created_at DESC
@@ -148,7 +150,7 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 		var item SearchResult
 		if err := rows.Scan(
 			&item.EntryID, &item.Title, &item.Summary, &item.ContentPreview,
-			&item.Tags, &item.Relevance,
+			&item.Tags, &item.Confidence, &item.SupersededBy, &item.Relevance,
 		); err != nil {
 			return nil, 0, err
 		}
