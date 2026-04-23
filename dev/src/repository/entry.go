@@ -47,13 +47,16 @@ func (r *EntryRepository) Create(ctx context.Context, entry *model.Entry) error 
 func (r *EntryRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Entry, error) {
 	entry := &model.Entry{}
 	err := r.pool.QueryRow(ctx,
-		`SELECT id, title, content, summary, detail, action, category_id, source, source_type, source_ref, tags, is_archived, created_at, updated_at
+		`SELECT id, title, content, summary, detail, action, category_id, source, source_type, source_ref, tags, is_archived,
+		        confidence, confirmations, flags_count, superseded_by, created_at, updated_at
 		 FROM entries WHERE id = $1`,
 		id,
 	).Scan(
 		&entry.ID, &entry.Title, &entry.Content, &entry.Summary, &entry.Detail, &entry.Action,
 		&entry.CategoryID, &entry.Source, &entry.SourceType, &entry.SourceRef,
-		&entry.Tags, &entry.IsArchived, &entry.CreatedAt, &entry.UpdatedAt,
+		&entry.Tags, &entry.IsArchived,
+		&entry.Confidence, &entry.Confirmations, &entry.FlagsCount, &entry.SupersededBy,
+		&entry.CreatedAt, &entry.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -128,17 +131,17 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 		whereClause = "WHERE " + strings.Join(conditions, " AND ")
 	}
 
-	// 排序（搜尋時以 ts_rank 為主排序，覆蓋 sort 參數）
+	// 排序（搜尋時以 ts_rank * confidence 為主排序，覆蓋 sort 參數）
 	var orderClause string
 	if hasSearch {
 		orderClause = fmt.Sprintf(
-			`ts_rank(
+			`(ts_rank(
 			   setweight(to_tsvector('simple', coalesce(e.summary, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.title, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(array_to_string(e.tags, ' '), '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'),
 			   plainto_tsquery('simple', $%d)
-			 ) DESC, e.created_at DESC`, searchArgIdx)
+			 ) * e.confidence) DESC, e.created_at DESC`, searchArgIdx)
 	} else {
 		sortColumn := "e.created_at"
 		switch filter.Sort {
@@ -174,7 +177,8 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 	// 查詢資料（content_preview 用 LEFT(content, 200)，列表不含 source/source_type/source_ref）
 	dataQuery := fmt.Sprintf(
 		`SELECT e.id, e.title, e.summary, LEFT(e.content, 200) AS content_preview, e.category_id,
-		        e.tags, e.is_archived, e.created_at, e.updated_at
+		        e.tags, e.is_archived, e.confidence, e.confirmations, e.flags_count, e.superseded_by,
+		        e.created_at, e.updated_at
 		 FROM entries e
 		 %s
 		 ORDER BY %s
@@ -194,7 +198,8 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 		var item model.EntryListItem
 		if err := rows.Scan(
 			&item.ID, &item.Title, &item.Summary, &item.ContentPreview, &item.CategoryID,
-			&item.Tags, &item.IsArchived, &item.CreatedAt, &item.UpdatedAt,
+			&item.Tags, &item.IsArchived, &item.Confidence, &item.Confirmations, &item.FlagsCount, &item.SupersededBy,
+			&item.CreatedAt, &item.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -252,6 +257,115 @@ func (r *EntryRepository) Delete(ctx context.Context, id uuid.UUID) error {
 		return model.NewAppError(404, model.ErrCodeNotFound, "知識條目不存在")
 	}
 	return nil
+}
+
+// ConfirmEntry 確認知識條目有用，增加 confirmations 並重算 confidence
+func (r *EntryRepository) ConfirmEntry(ctx context.Context, id uuid.UUID) (*model.Entry, error) {
+	entry := &model.Entry{}
+	err := r.pool.QueryRow(ctx,
+		`UPDATE entries
+		 SET confirmations = confirmations + 1,
+		     confidence = LEAST(0.5 + (confirmations + 1) * 0.05 - flags_count * 0.1, 1.0),
+		     updated_at = NOW()
+		 WHERE id = $1
+		 RETURNING id, title, content, summary, detail, action, category_id, source, source_type, source_ref, tags, is_archived,
+		           confidence, confirmations, flags_count, superseded_by, created_at, updated_at`,
+		id,
+	).Scan(
+		&entry.ID, &entry.Title, &entry.Content, &entry.Summary, &entry.Detail, &entry.Action,
+		&entry.CategoryID, &entry.Source, &entry.SourceType, &entry.SourceRef,
+		&entry.Tags, &entry.IsArchived,
+		&entry.Confidence, &entry.Confirmations, &entry.FlagsCount, &entry.SupersededBy,
+		&entry.CreatedAt, &entry.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, model.NewAppError(404, model.ErrCodeNotFound, "知識條目不存在")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return entry, nil
+}
+
+// FlagEntry 標記知識條目問題，建立 flag 記錄並更新 confidence（事務）
+func (r *EntryRepository) FlagEntry(ctx context.Context, id uuid.UUID, reason string, note *string) (*model.Entry, *model.EntryFlag, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// 建立 flag 記錄
+	flag := &model.EntryFlag{}
+	err = tx.QueryRow(ctx,
+		`INSERT INTO entry_flags (entry_id, reason, note)
+		 VALUES ($1, $2, $3)
+		 RETURNING id, entry_id, reason, note, created_at`,
+		id, reason, note,
+	).Scan(&flag.ID, &flag.EntryID, &flag.Reason, &flag.Note, &flag.CreatedAt)
+	if err != nil {
+		if strings.Contains(err.Error(), "entry_flags_entry_id_fkey") {
+			return nil, nil, model.NewAppError(404, model.ErrCodeNotFound, "知識條目不存在")
+		}
+		return nil, nil, err
+	}
+
+	// 更新 entry 的 flags_count 和 confidence
+	entry := &model.Entry{}
+	err = tx.QueryRow(ctx,
+		`UPDATE entries
+		 SET flags_count = flags_count + 1,
+		     confidence = GREATEST(0.5 + confirmations * 0.05 - (flags_count + 1) * 0.1, 0.0),
+		     updated_at = NOW()
+		 WHERE id = $1
+		 RETURNING id, title, content, summary, detail, action, category_id, source, source_type, source_ref, tags, is_archived,
+		           confidence, confirmations, flags_count, superseded_by, created_at, updated_at`,
+		id,
+	).Scan(
+		&entry.ID, &entry.Title, &entry.Content, &entry.Summary, &entry.Detail, &entry.Action,
+		&entry.CategoryID, &entry.Source, &entry.SourceType, &entry.SourceRef,
+		&entry.Tags, &entry.IsArchived,
+		&entry.Confidence, &entry.Confirmations, &entry.FlagsCount, &entry.SupersededBy,
+		&entry.CreatedAt, &entry.UpdatedAt,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, nil, err
+	}
+
+	return entry, flag, nil
+}
+
+// GetFlags 取得知識條目的所有 flag 記錄
+func (r *EntryRepository) GetFlags(ctx context.Context, entryID uuid.UUID) ([]model.EntryFlag, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, entry_id, reason, note, created_at
+		 FROM entry_flags
+		 WHERE entry_id = $1
+		 ORDER BY created_at DESC`,
+		entryID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	flags := make([]model.EntryFlag, 0)
+	for rows.Next() {
+		var flag model.EntryFlag
+		if err := rows.Scan(&flag.ID, &flag.EntryID, &flag.Reason, &flag.Note, &flag.CreatedAt); err != nil {
+			return nil, err
+		}
+		flags = append(flags, flag)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return flags, nil
 }
 
 // ExistsBySourceRef 檢查指定 source_type + source_ref 的 entry 是否已存在（用於去重）

@@ -10,7 +10,7 @@ import (
 )
 
 // Setup 設定路由
-func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler) *gin.Engine {
+func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler) *gin.Engine {
 	r := gin.Default()
 
 	// 健康檢查（不需認證）
@@ -59,6 +59,11 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 			entries.GET("/:id", entryHandler.GetByID)
 			entries.PATCH("/:id", entryHandler.Update)
 			entries.DELETE("/:id", entryHandler.Delete)
+
+			// 信心度操作
+			entries.POST("/:id/confirm", confidenceHandler.Confirm)
+			entries.POST("/:id/flag", confidenceHandler.Flag)
+			entries.GET("/:id/flags", confidenceHandler.ListFlags)
 
 			// LLM 自動分類
 			entries.POST("/:id/classify", classifyHandler.Classify)

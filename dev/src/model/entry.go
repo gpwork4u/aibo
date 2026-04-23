@@ -8,20 +8,24 @@ import (
 
 // Entry 知識條目資料庫模型
 type Entry struct {
-	ID         uuid.UUID  `json:"id"`
-	Title      *string    `json:"title"`
-	Content    *string    `json:"content"`
-	Summary    *string    `json:"summary"`
-	Detail     *string    `json:"detail"`
-	Action     *string    `json:"action"`
-	CategoryID *uuid.UUID `json:"category_id"`
-	Source     *string    `json:"source"`
-	SourceType *string    `json:"source_type"`
-	SourceRef  *string    `json:"source_ref"`
-	Tags       []string   `json:"tags"`
-	IsArchived bool       `json:"is_archived"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	ID            uuid.UUID  `json:"id"`
+	Title         *string    `json:"title"`
+	Content       *string    `json:"content"`
+	Summary       *string    `json:"summary"`
+	Detail        *string    `json:"detail"`
+	Action        *string    `json:"action"`
+	CategoryID    *uuid.UUID `json:"category_id"`
+	Source        *string    `json:"source"`
+	SourceType    *string    `json:"source_type"`
+	SourceRef     *string    `json:"source_ref"`
+	Tags          []string   `json:"tags"`
+	IsArchived    bool       `json:"is_archived"`
+	Confidence    float64    `json:"confidence"`
+	Confirmations int        `json:"confirmations"`
+	FlagsCount    int        `json:"flags_count"`
+	SupersededBy  *uuid.UUID `json:"superseded_by"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
 // EntryListItem 列表查詢用的條目（content 改為 preview，不含 source 欄位）
@@ -33,6 +37,10 @@ type EntryListItem struct {
 	CategoryID     *uuid.UUID `json:"category_id"`
 	Tags           []string   `json:"tags"`
 	IsArchived     bool       `json:"is_archived"`
+	Confidence     float64    `json:"confidence"`
+	Confirmations  int        `json:"confirmations"`
+	FlagsCount     int        `json:"flags_count"`
+	SupersededBy   *uuid.UUID `json:"superseded_by"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
 }
