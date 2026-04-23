@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-
-	"github.com/gpwork4u/aibo/repository"
 )
 
 // StatsResult 統計結果
@@ -30,11 +28,11 @@ type RecentEntryResult struct {
 
 // StatsService 統計業務邏輯
 type StatsService struct {
-	repo *repository.StatsRepository
+	repo StatsRepository
 }
 
 // NewStatsService 建立新的 StatsService
-func NewStatsService(repo *repository.StatsRepository) *StatsService {
+func NewStatsService(repo StatsRepository) *StatsService {
 	return &StatsService{repo: repo}
 }
 

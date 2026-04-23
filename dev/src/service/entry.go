@@ -7,16 +7,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gpwork4u/aibo/model"
-	"github.com/gpwork4u/aibo/repository"
 )
 
 // EntryService 知識條目業務邏輯
 type EntryService struct {
-	repo *repository.EntryRepository
+	repo EntryRepository
 }
 
 // NewEntryService 建立新的 EntryService
-func NewEntryService(repo *repository.EntryRepository) *EntryService {
+func NewEntryService(repo EntryRepository) *EntryService {
 	return &EntryService{repo: repo}
 }
 

@@ -16,7 +16,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/gpwork4u/aibo/dto"
 	"github.com/gpwork4u/aibo/model"
-	"github.com/gpwork4u/aibo/repository"
 )
 
 const (
@@ -32,12 +31,12 @@ var (
 
 // GitImportService Git 匯入業務邏輯
 type GitImportService struct {
-	entryRepo        *repository.EntryRepository
+	entryRepo        EntryRepository
 	allowedRepoPaths []string
 }
 
 // NewGitImportService 建立新的 GitImportService
-func NewGitImportService(entryRepo *repository.EntryRepository) *GitImportService {
+func NewGitImportService(entryRepo EntryRepository) *GitImportService {
 	return &GitImportService{entryRepo: entryRepo}
 }
 

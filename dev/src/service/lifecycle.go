@@ -11,11 +11,11 @@ import (
 
 // LifecycleService 知識生命週期業務邏輯
 type LifecycleService struct {
-	repo *repository.EntryRepository
+	repo EntryRepository
 }
 
 // NewLifecycleService 建立新的 LifecycleService
-func NewLifecycleService(repo *repository.EntryRepository) *LifecycleService {
+func NewLifecycleService(repo EntryRepository) *LifecycleService {
 	return &LifecycleService{repo: repo}
 }
 

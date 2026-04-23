@@ -22,6 +22,7 @@ import (
 type LlmProviderService struct {
 	repo   *repository.LlmProviderRepository
 	crypto *crypto.AESCrypto
+	llmSvc *LlmService // 反向參考，用於在 Update/Delete 時清除 client 快取
 }
 
 // NewLlmProviderService 建立新的 LlmProviderService
@@ -30,6 +31,11 @@ func NewLlmProviderService(repo *repository.LlmProviderRepository, aesCrypto *cr
 		repo:   repo,
 		crypto: aesCrypto,
 	}
+}
+
+// SetLlmService 設定 LlmService 反向參考（避免循環依賴）
+func (s *LlmProviderService) SetLlmService(llmSvc *LlmService) {
+	s.llmSvc = llmSvc
 }
 
 // CreateInput 建立 LLM Provider 的輸入
@@ -196,12 +202,21 @@ func (s *LlmProviderService) Update(ctx context.Context, id uuid.UUID, input Upd
 		}
 	}
 
+	// 清除該 provider 的 client 快取（設定可能已變更）
+	if s.llmSvc != nil {
+		s.llmSvc.InvalidateClient(id)
+	}
+
 	// 重新取得更新後的資料
 	return s.repo.FindByID(ctx, id)
 }
 
 // Delete 刪除 LLM Provider（硬刪除）
 func (s *LlmProviderService) Delete(ctx context.Context, id uuid.UUID) error {
+	// 清除該 provider 的 client 快取
+	if s.llmSvc != nil {
+		s.llmSvc.InvalidateClient(id)
+	}
 	return s.repo.Delete(ctx, id)
 }
 

@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/gpwork4u/aibo/crypto"
 	"github.com/gpwork4u/aibo/model"
-	"github.com/gpwork4u/aibo/repository"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/calendar/v3"
@@ -30,16 +29,16 @@ type GcalConfig struct {
 
 // GcalService Google Calendar 整合服務
 type GcalService struct {
-	gcalRepo  *repository.GcalIntegrationRepository
-	entryRepo *repository.EntryRepository
+	gcalRepo  GcalIntegrationRepository
+	entryRepo EntryRepository
 	aesCrypto *crypto.AESCrypto
 	config    *GcalConfig
 }
 
 // NewGcalService 建立新的 GcalService
 func NewGcalService(
-	gcalRepo *repository.GcalIntegrationRepository,
-	entryRepo *repository.EntryRepository,
+	gcalRepo GcalIntegrationRepository,
+	entryRepo EntryRepository,
 	aesCrypto *crypto.AESCrypto,
 	config *GcalConfig,
 ) *GcalService {

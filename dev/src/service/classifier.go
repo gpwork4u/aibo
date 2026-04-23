@@ -9,25 +9,24 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gpwork4u/aibo/model"
-	"github.com/gpwork4u/aibo/repository"
 )
 
 // ClassifierService 自動分類業務邏輯
 type ClassifierService struct {
-	llmSvc      *LlmService
-	entryRepo   *repository.EntryRepository
-	categoryRepo *repository.CategoryRepository
+	llmSvc       *LlmService
+	entryRepo    EntryRepository
+	categoryRepo CategoryRepository
 }
 
 // NewClassifierService 建立新的 ClassifierService
 func NewClassifierService(
 	llmSvc *LlmService,
-	entryRepo *repository.EntryRepository,
-	categoryRepo *repository.CategoryRepository,
+	entryRepo EntryRepository,
+	categoryRepo CategoryRepository,
 ) *ClassifierService {
 	return &ClassifierService{
-		llmSvc:      llmSvc,
-		entryRepo:   entryRepo,
+		llmSvc:       llmSvc,
+		entryRepo:    entryRepo,
 		categoryRepo: categoryRepo,
 	}
 }

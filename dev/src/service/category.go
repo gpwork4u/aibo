@@ -6,16 +6,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gpwork4u/aibo/model"
-	"github.com/gpwork4u/aibo/repository"
 )
 
 // CategoryService 分類業務邏輯
 type CategoryService struct {
-	repo *repository.CategoryRepository
+	repo CategoryRepository
 }
 
 // NewCategoryService 建立新的 CategoryService
-func NewCategoryService(repo *repository.CategoryRepository) *CategoryService {
+func NewCategoryService(repo CategoryRepository) *CategoryService {
 	return &CategoryService{repo: repo}
 }
 
