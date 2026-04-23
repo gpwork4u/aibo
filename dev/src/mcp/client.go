@@ -45,6 +45,8 @@ type SearchResultItem struct {
 	EntryID        string   `json:"entry_id"`
 	Title          *string  `json:"title"`
 	Summary        *string  `json:"summary"`
+	Detail         *string  `json:"detail,omitempty"`
+	Action         *string  `json:"action,omitempty"`
 	ContentPreview string   `json:"content_preview"`
 	Tags           []string `json:"tags"`
 	Relevance      float64  `json:"relevance"`
@@ -87,12 +89,20 @@ type FlagResponse struct {
 	Message    string  `json:"message"`
 }
 
+// RecentEntryItem 最近條目項目
+type RecentEntryItem struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	CreatedAt string `json:"created_at"`
+}
+
 // StatsResponse 統計回應
 type StatsResponse struct {
 	TotalEntries      int                    `json:"total_entries"`
 	TotalCategories   int                    `json:"total_categories"`
 	EntriesByCategory []CategoryCountItem    `json:"entries_by_category"`
 	AvgConfidence     float64                `json:"avg_confidence"`
+	RecentEntries     []RecentEntryItem      `json:"recent_entries"`
 }
 
 // CategoryCountItem 分類計數項目

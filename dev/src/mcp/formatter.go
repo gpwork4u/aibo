@@ -32,6 +32,16 @@ func FormatSearchResults(results []SearchResultItem, total int) string {
 			sb.WriteString(fmt.Sprintf("內容: %s\n", r.ContentPreview))
 		}
 
+		// detail（如有）
+		if r.Detail != nil && *r.Detail != "" {
+			sb.WriteString(fmt.Sprintf("詳情: %s\n", *r.Detail))
+		}
+
+		// action（如有）
+		if r.Action != nil && *r.Action != "" {
+			sb.WriteString(fmt.Sprintf("行動: %s\n", *r.Action))
+		}
+
 		// tags
 		if len(r.Tags) > 0 {
 			sb.WriteString(fmt.Sprintf("標籤: %s\n", strings.Join(r.Tags, ", ")))
@@ -81,6 +91,17 @@ func FormatStats(stats *StatsResponse) string {
 		sb.WriteString("\n分類分布:\n")
 		for _, cat := range stats.EntriesByCategory {
 			sb.WriteString(fmt.Sprintf("  - %s: %d 筆\n", cat.Category, cat.Count))
+		}
+	}
+
+	if len(stats.RecentEntries) > 0 {
+		sb.WriteString("\n最近條目:\n")
+		for _, re := range stats.RecentEntries {
+			title := re.Title
+			if title == "" {
+				title = "(無標題)"
+			}
+			sb.WriteString(fmt.Sprintf("  - [%s] %s (%s)\n", re.ID, title, re.CreatedAt))
 		}
 	}
 

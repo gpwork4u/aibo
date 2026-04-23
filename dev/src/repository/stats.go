@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -61,6 +62,34 @@ func (r *StatsRepository) GetEntriesByCategory(ctx context.Context) ([]CategoryC
 			return nil, err
 		}
 		result = append(result, cc)
+	}
+	return result, rows.Err()
+}
+
+// RecentEntry 最近條目
+type RecentEntry struct {
+	ID        string
+	Title     string
+	CreatedAt time.Time
+}
+
+// GetRecentEntries 取得最近 5 筆條目
+func (r *StatsRepository) GetRecentEntries(ctx context.Context) ([]RecentEntry, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, COALESCE(title, ''), created_at FROM entries ORDER BY created_at DESC LIMIT 5`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []RecentEntry
+	for rows.Next() {
+		var re RecentEntry
+		if err := rows.Scan(&re.ID, &re.Title, &re.CreatedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, re)
 	}
 	return result, rows.Err()
 }

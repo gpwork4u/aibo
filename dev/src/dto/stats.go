@@ -6,6 +6,14 @@ type StatsResponse struct {
 	TotalCategories   int                 `json:"total_categories"`
 	EntriesByCategory []CategoryCountItem `json:"entries_by_category"`
 	AvgConfidence     float64             `json:"avg_confidence"`
+	RecentEntries     []RecentEntryItem   `json:"recent_entries"`
+}
+
+// RecentEntryItem 最近條目項目
+type RecentEntryItem struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	CreatedAt string `json:"created_at"`
 }
 
 // CategoryCountItem 分類計數項目

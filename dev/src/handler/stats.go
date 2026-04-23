@@ -38,10 +38,20 @@ func (h *StatsHandler) GetStats(c *gin.Context) {
 		})
 	}
 
+	recentEntries := make([]dto.RecentEntryItem, 0, len(result.RecentEntries))
+	for _, re := range result.RecentEntries {
+		recentEntries = append(recentEntries, dto.RecentEntryItem{
+			ID:        re.ID,
+			Title:     re.Title,
+			CreatedAt: re.CreatedAt,
+		})
+	}
+
 	c.JSON(http.StatusOK, dto.StatsResponse{
 		TotalEntries:      result.TotalEntries,
 		TotalCategories:   result.TotalCategories,
 		EntriesByCategory: byCategory,
 		AvgConfidence:     result.AvgConfidence,
+		RecentEntries:     recentEntries,
 	})
 }

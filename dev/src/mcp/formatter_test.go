@@ -123,6 +123,10 @@ func TestFormatStats(t *testing.T) {
 			{Category: "golang", Count: 30},
 			{Category: "devops", Count: 25},
 		},
+		RecentEntries: []aimcp.RecentEntryItem{
+			{ID: "entry-1", Title: "Go 入門", CreatedAt: "2026-04-20T10:00:00Z"},
+			{ID: "entry-2", Title: "", CreatedAt: "2026-04-19T09:00:00Z"},
+		},
 	}
 
 	result := aimcp.FormatStats(stats)
@@ -140,5 +144,58 @@ func TestFormatStats(t *testing.T) {
 	}
 	if !strings.Contains(result, "devops: 25 筆") {
 		t.Error("缺少分類分布")
+	}
+	if !strings.Contains(result, "最近條目") {
+		t.Error("缺少最近條目區塊")
+	}
+	if !strings.Contains(result, "entry-1") {
+		t.Error("缺少最近條目 ID")
+	}
+	if !strings.Contains(result, "Go 入門") {
+		t.Error("缺少最近條目標題")
+	}
+	if !strings.Contains(result, "(無標題)") {
+		t.Error("空標題應顯示 (無標題)")
+	}
+}
+
+func TestFormatSearchResults_WithDetailAndAction(t *testing.T) {
+	detail := "詳細的錯誤處理說明"
+	action := "使用 errors.Is 進行比較"
+	items := []aimcp.SearchResultItem{
+		{
+			EntryID:        "abc-123",
+			Title:          strPtr("Go 錯誤處理"),
+			Summary:        strPtr("Go 使用 error interface 進行錯誤處理"),
+			Detail:         &detail,
+			Action:         &action,
+			ContentPreview: "Go 使用 error interface...",
+			Tags:           []string{"golang"},
+			Relevance:      0.85,
+		},
+		{
+			EntryID:        "def-456",
+			Title:          strPtr("基本知識"),
+			Summary:        strPtr("簡單摘要"),
+			Detail:         nil,
+			Action:         nil,
+			ContentPreview: "內容",
+			Tags:           nil,
+			Relevance:      0.60,
+		},
+	}
+
+	result := aimcp.FormatSearchResults(items, 2)
+
+	if !strings.Contains(result, "詳情: 詳細的錯誤處理說明") {
+		t.Error("缺少 detail 欄位")
+	}
+	if !strings.Contains(result, "行動: 使用 errors.Is 進行比較") {
+		t.Error("缺少 action 欄位")
+	}
+	// 第二筆沒有 detail/action，不應出現
+	parts := strings.Split(result, "--- [2] ---")
+	if len(parts) > 1 && strings.Contains(parts[1], "詳情:") {
+		t.Error("空 detail 不應顯示")
 	}
 }
