@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Aibo Browser E2E Test 設定
+ * Aibo Browser E2E Test 設定（Sprint 7）
  *
  * 環境變數：
  * - BASE_URL: 前端 URL（預設 http://localhost:3000）
@@ -9,19 +9,26 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./specs",
-  fullyParallel: true,
+  fullyParallel: false, // 改為序列以避免共用 API/DB state 衝突
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 1 : 1,
+  timeout: 30_000,
+  expect: {
+    timeout: 10_000,
+  },
   reporter: [
-    ["html", { outputFolder: "../screenshots/report" }],
+    ["html", { outputFolder: "../screenshots/report", open: "never" }],
     ["list"],
+    ["json", { outputFile: "../reports/browser-results.json" }],
   ],
   use: {
     baseURL: process.env.BASE_URL || "http://localhost:3000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
-    video: "on-first-retry",
+    video: "retain-on-failure",
+    actionTimeout: 10_000,
+    navigationTimeout: 15_000,
   },
   projects: [
     {
@@ -32,11 +39,10 @@ export default defineConfig({
       name: "firefox",
       use: { ...devices["Desktop Firefox"] },
     },
+    {
+      name: "mobile-chromium",
+      use: { ...devices["Pixel 5"] },
+      testMatch: /f021_layout\.spec\.ts/, // mobile 僅跑 layout 響應式測試
+    },
   ],
-  /* 可選：啟動前端 dev server */
-  // webServer: {
-  //   command: 'npm run dev',
-  //   url: 'http://localhost:3000',
-  //   reuseExistingServer: !process.env.CI,
-  // },
 });
