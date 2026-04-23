@@ -51,6 +51,9 @@
 | F-011 | MCP Server 模式 | Sprint 4 | P0 | `specs/features/f011-mcp-server.md` |
 | F-012 | 知識結構升級 | Sprint 4 | P0 | `specs/features/f012-knowledge-structure.md` |
 | F-013 | 信心度機制 | Sprint 4 | P0 | `specs/features/f013-confidence.md` |
+| F-014 | Tags 分層 + 多維度搜尋 | Sprint 5 | P0 | `specs/features/f014-tags-hierarchy.md` |
+| F-015 | 知識生命週期 | Sprint 5 | P0 | `specs/features/f015-knowledge-lifecycle.md` |
+| F-016 | 中文分詞優化 | Sprint 5 | P0 | `specs/features/f016-chinese-tokenizer.md` |
 
 ## Sprint 規劃
 
@@ -73,6 +76,11 @@
 - F-011 MCP Server 模式
 - F-012 知識結構升級
 - F-013 信心度機制
+
+### Sprint 5：搜尋與品質
+- F-014 Tags 分層 + 多維度搜尋
+- F-015 知識生命週期
+- F-016 中文分詞優化
 
 ## 非功能需求
 

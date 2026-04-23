@@ -978,3 +978,177 @@ Sprint 4 僅新增 1 個依賴（mcp-go），用於 MCP server binary。主 API 
 | stdio MCP server 偵錯困難 | 開發期除錯不便 | 增加 slog 日誌到 stderr、使用 mcp-go 的 InProcess transport 做 unit test |
 | 搜尋排序 ts_rank * confidence 可能讓新 entry 排名過低 | 使用者找不到新加入的知識 | confidence 預設 0.5 而非 0，確保新 entry 有基本曝光 |
 | ALTER TABLE 索引重建影響搜尋 | migration 期間搜尋變慢 | 個人知識庫規模小，影響可忽略；若有疑慮可用 CONCURRENTLY |
+
+---
+
+# Sprint 5 技術選型補充調查
+
+## 調查日期
+2026-04-22
+
+## 28. PostgreSQL 中文分詞方案
+
+### 候選方案
+
+| 方案 | GitHub Stars | 分詞方式 | 外部依賴 | Docker 安裝難度 | 中文效果 | 維護狀態 |
+|------|-------------|---------|---------|----------------|---------|---------|
+| zhparser | 2.8k+ | SCWS 詞典分詞 | 需安裝 SCWS 詞典庫 | 高（需編譯 SCWS + zhparser） | 最佳（詞級分詞，如「資料庫」整詞識別） | 活躍，多個 fork 維護 |
+| pg_cjk_parser | 200+ | 2-gram（CJK 字元） | 無（純 C 擴展） | 中（需從原始碼編譯） | 好（2-gram 覆蓋所有組合） | 較少更新，但穩定 |
+| pg_bigm | 400+ | 2-gram（所有字元） | 無（純 C 擴展） | 低（支援 apt install） | 好（2-gram 對中文效果等同 pg_cjk_parser） | 活躍，正式版本釋出 |
+| PGroonga | 3k+ | Groonga 全語言分詞 | 需安裝 Groonga 引擎 | 高（依賴鏈長） | 最佳（專業分詞引擎） | 活躍 |
+
+### 方案分析
+
+#### zhparser（SCWS 詞典分詞）
+- **優點**：詞級分詞，精確度最高（能正確拆分「資料庫效能調優」為「資料庫/效能/調優」）
+- **缺點**：
+  - 需額外安裝 SCWS 詞典庫（約 30MB）
+  - Docker 映像需自行編譯 SCWS + zhparser
+  - 詞典可能需要更新（新詞覆蓋不足）
+  - 只支援中文，不支援日韓文
+- **Docker 方案**：社群有 `abcfy2/zhparser` 預建映像，但可能版本滯後
+
+#### pg_cjk_parser（CJK 2-gram）
+- **優點**：
+  - 基於 PostgreSQL 內建 parser 修改，穩定性高
+  - 支援 CJK（中日韓）三種語言
+  - 無外部依賴
+- **缺點**：
+  - 需從原始碼編譯（需 postgresql-server-dev）
+  - GitHub 活躍度較低
+  - 2-gram 會產生較多噪音（如「資料」+「料庫」+「庫效」）
+
+#### pg_bigm（bi-gram）
+- **優點**：
+  - 2-gram 索引，天然支援所有語言的子字串搜尋
+  - 安裝最簡單（Debian/Ubuntu 可 `apt install postgresql-16-pg-bigm`）
+  - 不需要特殊的 TEXT SEARCH CONFIGURATION，直接用 LIKE + GIN 索引
+  - 與現有搜尋架構整合最容易（只替換 pg_trgm 的模糊搜尋部分）
+- **缺點**：
+  - 索引體積比 zhparser 大（所有 2-gram 組合）
+  - 不是「詞級」分詞，精確度略低於 zhparser
+  - 搜尋短字串（1-2 字）時可能有較多噪音
+
+#### PGroonga
+- **優點**：最全面的全語言搜尋支援
+- **缺點**：依賴 Groonga 引擎，映像體積大，過度設計
+
+### 決策
+選擇 **pg_bigm**
+
+### 理由
+1. **安裝最簡單**：aibo 使用 Docker 部署，pg_bigm 可直接 apt install 或從原始碼快速編譯，不需要額外的詞典庫
+2. **與現有架構互補**：simple tsvector 處理英文精確搜尋 + pg_bigm 處理中文/模糊搜尋，替換現有的 pg_trgm
+3. **無維護成本**：不需要更新詞典（vs zhparser 的 SCWS 詞典），2-gram 是純演算法方案
+4. **個人知識庫規模**：索引體積略大的缺點在小規模資料下可忽略
+5. **保留升級路徑**：如果 pg_bigm 的精確度不足，未來可升級為 zhparser（替換索引即可，搜尋 SQL 結構不變）
+
+### pg_bigm vs pg_trgm 關鍵差異
+
+| 特性 | pg_trgm (3-gram) | pg_bigm (2-gram) |
+|------|-------------------|-------------------|
+| N-gram 大小 | 3 | 2 |
+| 中文支援 | 差（3-byte trigram 跨字問題） | 好（2-gram 對中文字元自然對齊） |
+| 索引體積 | 較小 | 較大 |
+| 搜尋精確度 | 英文較好 | 中文較好 |
+| 安裝方式 | PostgreSQL 內建 | 需額外安裝 |
+| 運算子 | `%%` similarity | LIKE + GIN 索引加速 |
+
+### 參考資料
+- [pg_bigm GitHub](https://github.com/pgbigm/pg_bigm)
+- [pg_bigm 文件](https://pgbigm.github.io/pg_bigm/pg_bigm_en.html)
+- [PGroonga vs pg_bigm 比較](https://pgroonga.github.io/reference/pgroonga-versus-pg-bigm.html)
+- [zhparser GitHub](https://github.com/amutu/zhparser)
+- [pg_cjk_parser GitHub](https://github.com/huangjimmy/pg_cjk_parser)
+- [abcfy2/zhparser Docker image](https://hub.docker.com/r/abcfy2/zhparser)
+
+---
+
+## 29. Tags 分層 — DB Schema 設計
+
+### 候選方案
+
+| 方案 | 優點 | 缺點 | 查詢效能 | 彈性 |
+|------|------|------|---------|------|
+| A: JSONB 單欄位 | 最靈活、一欄解決所有 | 統計困難、索引效率較低 | 中 | 高 |
+| B: 獨立欄位（domains TEXT[] + context JSONB） | 結構清晰、常查欄位有專用索引 | 需 migration 加欄位 | 高 | 中高 |
+| C: 關聯表（entry_tags + tag_types） | 正規化、統計方便、適合大規模 | JOIN 多、查詢複雜 | 中低 | 高 |
+
+### 方案分析
+
+#### 方案 A：全 JSONB
+
+```sql
+ALTER TABLE entries ADD COLUMN tag_data JSONB;
+-- {"domains": ["golang"], "context": {"languages": ["go"], "frameworks": ["gin"]}, "tags": ["middleware"]}
+```
+
+- 最靈活但查詢效率差
+- PostgreSQL JSONB 不保留欄位統計資訊，查詢規劃可能不佳
+
+#### 方案 B：混合模式（推薦）
+
+```sql
+ALTER TABLE entries ADD COLUMN domains TEXT[] DEFAULT '{}';
+ALTER TABLE entries ADD COLUMN context JSONB NULL;
+-- 保留原有 tags TEXT[]
+```
+
+- `domains` 是常用過濾欄位，使用 TEXT[] + GIN 索引，查詢效率高
+- `context` 是彈性欄位，使用 JSONB + jsonb_path_ops 索引，支援 `@>` 包含查詢
+- `tags` 保留向下相容
+
+#### 方案 C：完全正規化
+
+```sql
+CREATE TABLE tag_types (id UUID, name VARCHAR, ...);
+CREATE TABLE entry_tags (entry_id UUID, tag_type_id UUID, value VARCHAR, ...);
+```
+
+- 適合大規模多租戶系統
+- 對個人知識庫而言過度設計，JOIN 增加查詢複雜度
+
+### 決策
+選擇 **方案 B：混合模式（domains TEXT[] + context JSONB）**
+
+### 理由
+1. **查詢效能**：`domains` 作為獨立的 TEXT[] 欄位，GIN 索引對 `@>` 運算子的查詢效能最佳，比 JSONB 內嵌陣列快 2-3 倍
+2. **彈性**：`context` JSONB 允許自由定義維度（languages、frameworks、pattern 等），不需要為每個新維度加欄位
+3. **向下相容**：保留 `tags` 欄位，既有 API 和 MCP tools 不受影響
+4. **簡單 migration**：只需 ADD COLUMN，O(1) 操作
+5. **適合規模**：個人知識庫不需要完全正規化，混合模式在簡單和靈活之間取得平衡
+
+### JSONB 索引策略
+
+使用 `jsonb_path_ops` 而非預設的 `jsonb_ops`：
+- `jsonb_path_ops` 只支援 `@>` 運算子，但索引體積小 2-3 倍，查詢快 2 倍
+- aibo 的 context 查詢都是包含查詢（如 `context @> '{"languages": ["go"]}'`），完全匹配 `jsonb_path_ops`
+
+### 參考資料
+- [PostgreSQL JSONB Performance Best Practices](https://www.elysiate.com/blog/postgresql-jsonb-performance-best-practices)
+- [When To Avoid JSONB In A PostgreSQL Schema](https://www.heap.io/blog/when-to-avoid-jsonb-in-a-postgresql-schema)
+- [PostgreSQL JSONB - Powerful Storage for Semi-Structured Data](https://www.architecture-weekly.com/p/postgresql-jsonb-powerful-storage)
+- [PostgreSQL as a JSON database: Advanced patterns](https://aws.amazon.com/blogs/database/postgresql-as-a-json-database-advanced-patterns-and-best-practices/)
+
+---
+
+## 30. Sprint 5 新增依賴
+
+| 用途 | Package | 選擇理由 |
+|------|---------|---------|
+| 中文分詞 | pg_bigm (PostgreSQL extension) | 2-gram 索引、安裝簡單、無詞典依賴 |
+
+Sprint 5 不新增 Go 程式碼依賴，只新增 PostgreSQL 擴展。Docker image 需自訂以包含 pg_bigm。
+
+---
+
+## 31. Sprint 5 技術風險與緩解
+
+| 風險 | 影響 | 緩解措施 |
+|------|------|---------|
+| pg_bigm 在 Alpine Linux 上編譯失敗 | Docker image 無法建置 | 改用 postgres:16-bookworm + apt install；或提供預編譯 .so |
+| pg_bigm 索引體積過大 | 磁碟佔用增加 | 個人知識庫規模小（< 10000 entries），2-gram 索引體積可控 |
+| pg_bigm LIKE 查詢效能低於 pg_trgm %% | 搜尋變慢 | pg_bigm GIN 索引加速 LIKE，效能應相當；如不足可考慮 zhparser |
+| domains + context 欄位增加 LLM prompt 複雜度 | 分類品質下降 | 分離 prompt：先分類 category/tags，再提取 domains/context |
+| supersede 循環引用檢測效能 | 長鏈造成遞迴查詢慢 | 限制鏈長最多 10 層，WITH RECURSIVE + LIMIT |
+| 現有 entries 的 domains/context 為空 | 搜尋按 domain 過濾找不到舊資料 | 提供批次 re-classify API 更新舊 entries 的 domains/context |

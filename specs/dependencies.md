@@ -341,3 +341,97 @@ F-012 和 F-013 並行，取較長者完成後開始 F-011。
 | mcp-go SDK API 不穩定 | MCP server 需修改 | 封裝 tool handler，隔離 SDK 細節 |
 | LLM prompt 變長導致回應品質下降 | summary/detail/action 品質不佳 | 調整 prompt、測試多種 LLM provider |
 | 搜尋排序公式影響使用體驗 | 新 entry 排名過低 | confidence 預設 0.5，確保基本曝光 |
+
+---
+
+# Sprint 5 依賴圖譜
+
+## 功能總覽
+
+| 編號 | 名稱 | 優先級 | 工作量 |
+|------|------|--------|-------|
+| F-014 | Tags 分層 + 多維度搜尋 | P0 | 大（DB migration + model/dto/repository/service/handler 修改 + LLM prompt 更新） |
+| F-015 | 知識生命週期 | P0 | 中（新 API endpoint + 循環檢測邏輯 + lifecycle_status 計算） |
+| F-016 | 中文分詞優化 | P0 | 中（Docker image 自訂 + migration + 搜尋 SQL 修改） |
+
+## 依賴關係
+
+```
+Sprint 1-4 已完成基礎設施
+├── Entry CRUD（F-001）+ 知識結構（F-012）+ 信心度（F-013）
+├── LLM 分類（F-003）+ 智慧搜尋（F-005）
+├── MCP Server（F-011）
+└── 搜尋架構：simple tsvector + pg_trgm
+
+Sprint 5 新功能
+
+F-016 (中文分詞優化)  ── 無前置依賴（獨立的 DB 擴展 + 索引變更）
+    └── 自訂 Docker image（pg_bigm）
+    └── 修改搜尋 SQL（repository/search.go, repository/entry.go）
+
+F-014 (Tags 分層 + 多維度搜尋)
+    ├── 依賴 F-016 完成：搜尋 SQL 同時修改，避免重複重建索引
+    ├── 修改 Entry model/dto/repository/service/handler
+    └── 更新 LLM 分類 prompt（service/llm.go）
+
+F-015 (知識生命週期)  ── 無前置依賴（superseded_by 欄位已存在）
+    ├── 新增 handler/service 方法
+    └── 修改搜尋結果 DTO（新增 lifecycle_status）
+```
+
+## 依賴說明
+
+### F-014 和 F-016 的搜尋層重疊
+- F-014 需更新 FTS 索引（加入 domains 到權重 A）
+- F-016 需替換 pg_trgm 索引為 pg_bigm 索引
+- 兩者都修改 `repository/search.go` 和 `repository/entry.go` 的搜尋 SQL
+- **建議 F-016 先完成**（基礎設施層），F-014 在此基礎上加入 domains/context 過濾
+
+### F-015 獨立
+- F-015 使用已存在的 superseded_by 欄位，不需新的 migration
+- 只新增 API endpoint 和業務邏輯
+- 搜尋結果新增 lifecycle_status 是計算欄位，不影響搜尋 SQL 結構
+
+### 互相影響
+- F-014 和 F-015 都修改搜尋結果 DTO（SearchResultItem）：F-014 加 domains/context，F-015 加 lifecycle_status
+- 但兩者操作不同欄位，合併衝突風險低
+
+## 拓撲排序
+
+### Wave 0（先行，可並行）
+- **F-016: 中文分詞優化** -- Docker image 自訂 + pg_bigm migration + 搜尋 SQL 修改
+- **F-015: 知識生命週期** -- 新 API endpoint + lifecycle_status 邏輯（與 F-016 無依賴）
+- **QA: 撰寫 E2E test script** -- 根據 spec scenarios 撰寫測試案例
+
+### Wave 1（F-016 完成後）
+- **F-014: Tags 分層 + 多維度搜尋** -- 在 pg_bigm 索引基礎上加入 domains/context
+
+## 並行策略
+
+```
+時間線 ->
+
+Wave 0:  [F-016 中文分詞優化 ──────────────]
+         [F-015 知識生命週期 ──────────────]
+         [QA 撰寫 test script ────────────────────────]
+
+Wave 1:                    [F-014 Tags 分層 ───────────────────]
+
+Code Review:         [逐 PR 審查 ──────────────────────────────]
+```
+
+## 關鍵路徑
+
+F-016 -> F-014
+
+F-016 是 F-014 的前置（搜尋 SQL 基礎），F-015 獨立可並行。
+Sprint 5 關鍵路徑長度 = F-016 + F-014。
+
+## 風險項目
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| pg_bigm Alpine 編譯失敗 | Docker image 無法建置 | 改用 postgres:16-bookworm + apt install |
+| F-014 和 F-016 搜尋 SQL 合併衝突 | 開發延遲 | F-016 先 merge，F-014 基於 F-016 分支開發 |
+| F-014 和 F-015 都修改搜尋結果 DTO | 合併衝突 | 操作不同欄位，衝突小；先 merge 的 PR 另一邊 rebase |
+| LLM prompt 增加 domains/context 後品質下降 | 分類結果不佳 | 分離 prompt 或分步驟呼叫 LLM |
