@@ -10,7 +10,7 @@ import (
 )
 
 // Setup 設定路由
-func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler) *gin.Engine {
+func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler) *gin.Engine {
 	r := gin.Default()
 
 	// 健康檢查（不需認證）
@@ -63,6 +63,20 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 			// LLM 自動分類
 			entries.POST("/:id/classify", classifyHandler.Classify)
 			entries.POST("/classify-all", classifyHandler.ClassifyAll)
+		}
+
+		// Google Calendar 整合
+		integrations := v1.Group("/integrations")
+		{
+			integrations.POST("/gcal/auth", gcalHandler.StartAuth)
+			integrations.GET("/gcal/callback", gcalHandler.Callback)
+		}
+
+		// 匯入
+		importGroup := v1.Group("/import")
+		{
+			importGroup.POST("/git", gitImportHandler.Import)
+			importGroup.POST("/gcal", gcalHandler.Import)
 		}
 
 		// 搜尋

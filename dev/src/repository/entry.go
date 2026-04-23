@@ -251,6 +251,16 @@ func (r *EntryRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// ExistsBySourceRef 檢查指定 source_type + source_ref 的 entry 是否已存在（用於去重）
+func (r *EntryRepository) ExistsBySourceRef(ctx context.Context, sourceType, sourceRef string) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx,
+		"SELECT EXISTS(SELECT 1 FROM entries WHERE source_type = $1 AND source_ref = $2)",
+		sourceType, sourceRef,
+	).Scan(&exists)
+	return exists, err
+}
+
 // CategoryExists 檢查分類是否存在
 func (r *EntryRepository) CategoryExists(ctx context.Context, id uuid.UUID) (bool, error) {
 	var exists bool
