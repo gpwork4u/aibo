@@ -13,8 +13,11 @@ RUN go mod download
 # 複製原始碼
 COPY . .
 
-# 編譯
+# 編譯 API server
 RUN CGO_ENABLED=0 GOOS=linux go build -o /api-server .
+
+# 編譯 MCP server
+RUN CGO_ENABLED=0 GOOS=linux go build -o /aibo-mcp ./cmd/mcp
 
 ## Runtime stage
 FROM alpine:3.20
@@ -26,6 +29,7 @@ RUN apk add --no-cache ca-certificates tzdata
 
 # 複製編譯好的執行檔
 COPY --from=builder /api-server .
+COPY --from=builder /aibo-mcp .
 
 EXPOSE 8080
 

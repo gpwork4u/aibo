@@ -9,6 +9,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.5.5
 	github.com/joho/godotenv v1.5.1
+	github.com/mark3labs/mcp-go v0.49.0
 	github.com/sashabaranov/go-openai v1.36.1
 	golang.org/x/oauth2 v0.25.0
 	golang.org/x/time v0.9.0

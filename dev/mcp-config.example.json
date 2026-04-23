@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "aibo": {
+      "command": "./aibo-mcp",
+      "env": {
+        "AIBO_API_URL": "http://localhost:8080",
+        "AIBO_API_KEY": "aibo_your_key_here"
+      }
+    }
+  }
+}
