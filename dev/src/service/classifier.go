@@ -13,9 +13,10 @@ import (
 
 // ClassifierService 自動分類業務邏輯
 type ClassifierService struct {
-	llmSvc       *LlmService
-	entryRepo    EntryRepository
-	categoryRepo CategoryRepository
+	llmSvc         *LlmService
+	entryRepo      EntryRepository
+	categoryRepo   CategoryRepository
+	qualityChecker *QualityChecker
 }
 
 // NewClassifierService 建立新的 ClassifierService
@@ -25,9 +26,10 @@ func NewClassifierService(
 	categoryRepo CategoryRepository,
 ) *ClassifierService {
 	return &ClassifierService{
-		llmSvc:       llmSvc,
-		entryRepo:    entryRepo,
-		categoryRepo: categoryRepo,
+		llmSvc:         llmSvc,
+		entryRepo:      entryRepo,
+		categoryRepo:   categoryRepo,
+		qualityChecker: NewQualityChecker(),
 	}
 }
 
@@ -117,6 +119,36 @@ func (s *ClassifierService) ClassifyEntry(ctx context.Context, entryID uuid.UUID
 	}
 	if result.Action != "" {
 		entry.Action = &result.Action
+	}
+
+	// 品質檢測：對原始 content 和 LLM 產出的 summary/detail/action 執行 PII/Secret 偵測
+	allContent := content
+	if result.Summary != "" {
+		allContent += "\n" + result.Summary
+	}
+	if result.Detail != "" {
+		allContent += "\n" + result.Detail
+	}
+	if result.Action != "" {
+		allContent += "\n" + result.Action
+	}
+
+	flags, _ := s.qualityChecker.Check(allContent)
+
+	// 檢測 summary 長度
+	if result.Summary != "" {
+		summaryFlags, _ := s.qualityChecker.CheckSummaryLength(result.Summary)
+		flags = append(flags, summaryFlags...)
+	}
+
+	if len(flags) > 0 {
+		entry.QualityFlags = flags
+		slog.Info("品質檢測發現問題",
+			"entry_id", entryID,
+			"flags_count", len(flags),
+		)
+	} else {
+		entry.QualityFlags = nil
 	}
 
 	if err := s.entryRepo.Update(ctx, entry); err != nil {

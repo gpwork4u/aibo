@@ -25,12 +25,17 @@ func NewEntryRepository(pool *pgxpool.Pool) *EntryRepository {
 
 // Create 建立新知識條目
 func (r *EntryRepository) Create(ctx context.Context, entry *model.Entry) error {
-	_, err := r.pool.Exec(ctx,
-		`INSERT INTO entries (id, title, content, summary, detail, action, category_id, source, source_type, source_ref, tags, domains, context, is_archived, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+	qualityFlagsJSON, err := json.Marshal(entry.QualityFlags)
+	if err != nil || entry.QualityFlags == nil {
+		qualityFlagsJSON = []byte("[]")
+	}
+
+	_, err = r.pool.Exec(ctx,
+		`INSERT INTO entries (id, title, content, summary, detail, action, category_id, source, source_type, source_ref, tags, domains, context, is_archived, quality_flags, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
 		entry.ID, entry.Title, entry.Content, entry.Summary, entry.Detail, entry.Action,
 		entry.CategoryID, entry.Source, entry.SourceType, entry.SourceRef,
-		entry.Tags, entry.Domains, entry.Context, entry.IsArchived, entry.CreatedAt, entry.UpdatedAt,
+		entry.Tags, entry.Domains, entry.Context, entry.IsArchived, qualityFlagsJSON, entry.CreatedAt, entry.UpdatedAt,
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "idx_entries_source") {
@@ -47,9 +52,10 @@ func (r *EntryRepository) Create(ctx context.Context, entry *model.Entry) error 
 // FindByID 透過 ID 查找知識條目（完整 content）
 func (r *EntryRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Entry, error) {
 	entry := &model.Entry{}
+	var qualityFlagsJSON []byte
 	err := r.pool.QueryRow(ctx,
 		`SELECT id, title, content, summary, detail, action, category_id, source, source_type, source_ref, tags, domains, context, is_archived,
-		        confidence, confirmations, flags_count, superseded_by, created_at, updated_at
+		        confidence, confirmations, flags_count, superseded_by, quality_flags, created_at, updated_at
 		 FROM entries WHERE id = $1`,
 		id,
 	).Scan(
@@ -57,13 +63,16 @@ func (r *EntryRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.En
 		&entry.CategoryID, &entry.Source, &entry.SourceType, &entry.SourceRef,
 		&entry.Tags, &entry.Domains, &entry.Context, &entry.IsArchived,
 		&entry.Confidence, &entry.Confirmations, &entry.FlagsCount, &entry.SupersededBy,
-		&entry.CreatedAt, &entry.UpdatedAt,
+		&qualityFlagsJSON, &entry.CreatedAt, &entry.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if qualityFlagsJSON != nil {
+		_ = json.Unmarshal(qualityFlagsJSON, &entry.QualityFlags)
 	}
 	return entry, nil
 }
@@ -211,7 +220,7 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 	dataQuery := fmt.Sprintf(
 		`SELECT e.id, e.title, e.summary, LEFT(e.content, 200) AS content_preview, e.category_id,
 		        e.tags, e.domains, e.context, e.is_archived, e.confidence, e.confirmations, e.flags_count, e.superseded_by,
-		        e.created_at, e.updated_at
+		        e.quality_flags, e.created_at, e.updated_at
 		 FROM entries e
 		 %s
 		 ORDER BY %s
@@ -229,12 +238,16 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 	items := make([]model.EntryListItem, 0)
 	for rows.Next() {
 		var item model.EntryListItem
+		var qfJSON []byte
 		if err := rows.Scan(
 			&item.ID, &item.Title, &item.Summary, &item.ContentPreview, &item.CategoryID,
 			&item.Tags, &item.Domains, &item.Context, &item.IsArchived, &item.Confidence, &item.Confirmations, &item.FlagsCount, &item.SupersededBy,
-			&item.CreatedAt, &item.UpdatedAt,
+			&qfJSON, &item.CreatedAt, &item.UpdatedAt,
 		); err != nil {
 			return nil, err
+		}
+		if qfJSON != nil {
+			_ = json.Unmarshal(qfJSON, &item.QualityFlags)
 		}
 		items = append(items, item)
 	}
@@ -255,15 +268,20 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 
 // Update 部分更新知識條目
 func (r *EntryRepository) Update(ctx context.Context, entry *model.Entry) error {
+	updateQFJSON, jsonErr := json.Marshal(entry.QualityFlags)
+	if jsonErr != nil || entry.QualityFlags == nil {
+		updateQFJSON = []byte("[]")
+	}
+
 	tag, err := r.pool.Exec(ctx,
 		`UPDATE entries
 		 SET title = $1, content = $2, summary = $3, detail = $4, action = $5,
 		     category_id = $6, source = $7, source_type = $8,
-		     source_ref = $9, tags = $10, domains = $11, context = $12, is_archived = $13, updated_at = NOW()
-		 WHERE id = $14`,
+		     source_ref = $9, tags = $10, domains = $11, context = $12, is_archived = $13, quality_flags = $14, updated_at = NOW()
+		 WHERE id = $15`,
 		entry.Title, entry.Content, entry.Summary, entry.Detail, entry.Action,
 		entry.CategoryID, entry.Source, entry.SourceType, entry.SourceRef,
-		entry.Tags, entry.Domains, entry.Context, entry.IsArchived, entry.ID,
+		entry.Tags, entry.Domains, entry.Context, entry.IsArchived, updateQFJSON, entry.ID,
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "idx_entries_source") {
@@ -295,6 +313,7 @@ func (r *EntryRepository) Delete(ctx context.Context, id uuid.UUID) error {
 // ConfirmEntry 確認知識條目有用，增加 confirmations 並重算 confidence
 func (r *EntryRepository) ConfirmEntry(ctx context.Context, id uuid.UUID) (*model.Entry, error) {
 	entry := &model.Entry{}
+	var confirmQFJSON []byte
 	err := r.pool.QueryRow(ctx,
 		`UPDATE entries
 		 SET confirmations = confirmations + 1,
@@ -302,20 +321,23 @@ func (r *EntryRepository) ConfirmEntry(ctx context.Context, id uuid.UUID) (*mode
 		     updated_at = NOW()
 		 WHERE id = $1
 		 RETURNING id, title, content, summary, detail, action, category_id, source, source_type, source_ref, tags, domains, context, is_archived,
-		           confidence, confirmations, flags_count, superseded_by, created_at, updated_at`,
+		           confidence, confirmations, flags_count, superseded_by, quality_flags, created_at, updated_at`,
 		id,
 	).Scan(
 		&entry.ID, &entry.Title, &entry.Content, &entry.Summary, &entry.Detail, &entry.Action,
 		&entry.CategoryID, &entry.Source, &entry.SourceType, &entry.SourceRef,
 		&entry.Tags, &entry.Domains, &entry.Context, &entry.IsArchived,
 		&entry.Confidence, &entry.Confirmations, &entry.FlagsCount, &entry.SupersededBy,
-		&entry.CreatedAt, &entry.UpdatedAt,
+		&confirmQFJSON, &entry.CreatedAt, &entry.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, model.NewAppError(404, model.ErrCodeNotFound, "知識條目不存在")
 	}
 	if err != nil {
 		return nil, err
+	}
+	if confirmQFJSON != nil {
+		_ = json.Unmarshal(confirmQFJSON, &entry.QualityFlags)
 	}
 	return entry, nil
 }
@@ -345,6 +367,7 @@ func (r *EntryRepository) FlagEntry(ctx context.Context, id uuid.UUID, reason st
 
 	// 更新 entry 的 flags_count 和 confidence
 	entry := &model.Entry{}
+	var flagQFJSON []byte
 	err = tx.QueryRow(ctx,
 		`UPDATE entries
 		 SET flags_count = flags_count + 1,
@@ -352,17 +375,20 @@ func (r *EntryRepository) FlagEntry(ctx context.Context, id uuid.UUID, reason st
 		     updated_at = NOW()
 		 WHERE id = $1
 		 RETURNING id, title, content, summary, detail, action, category_id, source, source_type, source_ref, tags, domains, context, is_archived,
-		           confidence, confirmations, flags_count, superseded_by, created_at, updated_at`,
+		           confidence, confirmations, flags_count, superseded_by, quality_flags, created_at, updated_at`,
 		id,
 	).Scan(
 		&entry.ID, &entry.Title, &entry.Content, &entry.Summary, &entry.Detail, &entry.Action,
 		&entry.CategoryID, &entry.Source, &entry.SourceType, &entry.SourceRef,
 		&entry.Tags, &entry.Domains, &entry.Context, &entry.IsArchived,
 		&entry.Confidence, &entry.Confirmations, &entry.FlagsCount, &entry.SupersededBy,
-		&entry.CreatedAt, &entry.UpdatedAt,
+		&flagQFJSON, &entry.CreatedAt, &entry.UpdatedAt,
 	)
 	if err != nil {
 		return nil, nil, err
+	}
+	if flagQFJSON != nil {
+		_ = json.Unmarshal(flagQFJSON, &entry.QualityFlags)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
