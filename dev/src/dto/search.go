@@ -11,13 +11,15 @@ type SmartSearchRequest struct {
 
 // SearchResultItem 搜尋結果項目
 type SearchResultItem struct {
-	EntryID         uuid.UUID `json:"entry_id"`
-	Title           *string   `json:"title"`
-	Summary         *string   `json:"summary"`
-	ContentPreview  string    `json:"content_preview"`
-	Tags            []string  `json:"tags"`
-	Relevance       float64   `json:"relevance"`
-	MatchedKeywords []string  `json:"matched_keywords,omitempty"`
+	EntryID         uuid.UUID  `json:"entry_id"`
+	Title           *string    `json:"title"`
+	Summary         *string    `json:"summary"`
+	ContentPreview  string     `json:"content_preview"`
+	Tags            []string   `json:"tags"`
+	LifecycleStatus string     `json:"lifecycle_status"`
+	SupersededBy    *uuid.UUID `json:"superseded_by"`
+	Relevance       float64    `json:"relevance"`
+	MatchedKeywords []string   `json:"matched_keywords,omitempty"`
 }
 
 // SmartSearchResponse 智慧搜尋回應
@@ -30,12 +32,14 @@ type SmartSearchResponse struct {
 
 // SimpleSearchResultItem 簡單搜尋結果項目
 type SimpleSearchResultItem struct {
-	EntryID        uuid.UUID `json:"entry_id"`
-	Title          *string   `json:"title"`
-	Summary        *string   `json:"summary"`
-	ContentPreview string    `json:"content_preview"`
-	Tags           []string  `json:"tags"`
-	Relevance      float64   `json:"relevance"`
+	EntryID         uuid.UUID  `json:"entry_id"`
+	Title           *string    `json:"title"`
+	Summary         *string    `json:"summary"`
+	ContentPreview  string     `json:"content_preview"`
+	Tags            []string   `json:"tags"`
+	LifecycleStatus string     `json:"lifecycle_status"`
+	SupersededBy    *uuid.UUID `json:"superseded_by"`
+	Relevance       float64    `json:"relevance"`
 }
 
 // SimpleSearchResponse 簡單搜尋回應

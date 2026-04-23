@@ -46,6 +46,8 @@ type SearchResultOutput struct {
 	Summary         *string
 	ContentPreview  string
 	Tags            []string
+	LifecycleStatus string
+	SupersededBy    *uuid.UUID
 	Relevance       float64
 	MatchedKeywords []string
 }
@@ -68,12 +70,14 @@ type SimpleSearchOutput struct {
 
 // SimpleSearchResultOutput 簡單搜尋結果輸出
 type SimpleSearchResultOutput struct {
-	EntryID        uuid.UUID
-	Title          *string
-	Summary        *string
-	ContentPreview string
-	Tags           []string
-	Relevance      float64
+	EntryID         uuid.UUID
+	Title           *string
+	Summary         *string
+	ContentPreview  string
+	Tags            []string
+	LifecycleStatus string
+	SupersededBy    *uuid.UUID
+	Relevance       float64
 }
 
 // SmartSearch 智慧搜尋：LLM 展開同義詞 + 加權全文搜尋
@@ -149,12 +153,14 @@ func (s *SearchService) SmartSearch(ctx context.Context, input SmartSearchInput)
 		}
 
 		item := SearchResultOutput{
-			EntryID:        r.EntryID,
-			Title:          r.Title,
-			Summary:        r.Summary,
-			ContentPreview: preview,
-			Tags:           tags,
-			Relevance:      r.Relevance,
+			EntryID:         r.EntryID,
+			Title:           r.Title,
+			Summary:         r.Summary,
+			ContentPreview:  preview,
+			Tags:            tags,
+			LifecycleStatus: computeLifecycleStatus(r.SupersededBy, r.Confidence),
+			SupersededBy:    r.SupersededBy,
+			Relevance:       r.Relevance,
 		}
 
 		// 只在非降級模式下計算 matched_keywords
@@ -209,16 +215,29 @@ func (s *SearchService) SimpleSearch(ctx context.Context, input SimpleSearchInpu
 		}
 
 		output.Results = append(output.Results, SimpleSearchResultOutput{
-			EntryID:        r.EntryID,
-			Title:          r.Title,
-			Summary:        r.Summary,
-			ContentPreview: preview,
-			Tags:           tags,
-			Relevance:      r.Relevance,
+			EntryID:         r.EntryID,
+			Title:           r.Title,
+			Summary:         r.Summary,
+			ContentPreview:  preview,
+			Tags:            tags,
+			LifecycleStatus: computeLifecycleStatus(r.SupersededBy, r.Confidence),
+			SupersededBy:    r.SupersededBy,
+			Relevance:       r.Relevance,
 		})
 	}
 
 	return output, nil
+}
+
+// computeLifecycleStatus 根據 superseded_by 和 confidence 計算生命週期狀態
+func computeLifecycleStatus(supersededBy *uuid.UUID, confidence float64) string {
+	if supersededBy != nil {
+		return "superseded"
+	}
+	if confidence <= 0.2 {
+		return "degraded"
+	}
+	return "active"
 }
 
 // validateSearchQuery 驗證搜尋 query

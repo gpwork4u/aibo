@@ -119,8 +119,12 @@ func main() {
 	systemSvc := service.NewSystemService(systemRepo)
 	systemHandler := handler.NewSystemHandler(systemSvc)
 
+	// 初始化知識生命週期服務
+	lifecycleSvc := service.NewLifecycleService(entryRepo)
+	lifecycleHandler := handler.NewLifecycleHandler(lifecycleSvc)
+
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
