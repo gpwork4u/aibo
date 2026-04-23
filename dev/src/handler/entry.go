@@ -163,6 +163,15 @@ func (h *EntryHandler) List(c *gin.Context) {
 		if domains == nil {
 			domains = []string{}
 		}
+		itemQualityFlags := make([]dto.QualityFlagResponse, 0)
+		for _, qf := range item.QualityFlags {
+			itemQualityFlags = append(itemQualityFlags, dto.QualityFlagResponse{
+				Type:       qf.Type,
+				Pattern:    qf.Pattern,
+				Severity:   qf.Severity,
+				DetectedAt: qf.DetectedAt,
+			})
+		}
 		items = append(items, dto.EntryListItemResponse{
 			ID:              item.ID,
 			Title:           item.Title,
@@ -177,6 +186,7 @@ func (h *EntryHandler) List(c *gin.Context) {
 			Confirmations:   item.Confirmations,
 			FlagsCount:      item.FlagsCount,
 			SupersededBy:    item.SupersededBy,
+			QualityFlags:    itemQualityFlags,
 			LifecycleStatus: item.LifecycleStatus(),
 			CreatedAt:       item.CreatedAt,
 			UpdatedAt:       item.UpdatedAt,
@@ -470,6 +480,23 @@ func toEntryResponse(entry *model.Entry) dto.EntryResponse {
 	if domains == nil {
 		domains = []string{}
 	}
+	// 轉換 quality_flags
+	qualityFlags := make([]dto.QualityFlagResponse, 0)
+	qualityWarnings := make([]dto.QualityWarningResponse, 0)
+	for _, qf := range entry.QualityFlags {
+		qualityFlags = append(qualityFlags, dto.QualityFlagResponse{
+			Type:       qf.Type,
+			Pattern:    qf.Pattern,
+			Severity:   qf.Severity,
+			DetectedAt: qf.DetectedAt,
+		})
+		qualityWarnings = append(qualityWarnings, dto.QualityWarningResponse{
+			Type:     qf.Type,
+			Details:  qf.Pattern + " pattern detected",
+			Severity: qf.Severity,
+		})
+	}
+
 	return dto.EntryResponse{
 		ID:              entry.ID,
 		Title:           entry.Title,
@@ -489,6 +516,8 @@ func toEntryResponse(entry *model.Entry) dto.EntryResponse {
 		Confirmations:   entry.Confirmations,
 		FlagsCount:      entry.FlagsCount,
 		SupersededBy:    entry.SupersededBy,
+		QualityFlags:    qualityFlags,
+		QualityWarnings: qualityWarnings,
 		LifecycleStatus: entry.LifecycleStatus(),
 		CreatedAt:       entry.CreatedAt,
 		UpdatedAt:       entry.UpdatedAt,

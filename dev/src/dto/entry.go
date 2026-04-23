@@ -63,10 +63,20 @@ type EntryResponse struct {
 	Confidence      float64          `json:"confidence"`
 	Confirmations   int              `json:"confirmations"`
 	FlagsCount      int              `json:"flags_count"`
-	SupersededBy    *uuid.UUID       `json:"superseded_by"`
-	LifecycleStatus string           `json:"lifecycle_status"`
-	CreatedAt       time.Time        `json:"created_at"`
-	UpdatedAt       time.Time        `json:"updated_at"`
+	SupersededBy    *uuid.UUID               `json:"superseded_by"`
+	QualityFlags    []QualityFlagResponse    `json:"quality_flags"`
+	QualityWarnings []QualityWarningResponse `json:"quality_warnings,omitempty"`
+	LifecycleStatus string                   `json:"lifecycle_status"`
+	CreatedAt       time.Time                `json:"created_at"`
+	UpdatedAt       time.Time                `json:"updated_at"`
+}
+
+// QualityFlagResponse 品質標記回應
+type QualityFlagResponse struct {
+	Type       string    `json:"type"`
+	Pattern    string    `json:"pattern"`
+	Severity   string    `json:"severity"`
+	DetectedAt time.Time `json:"detected_at"`
 }
 
 // EntryListItemResponse 列表中的知識條目（含 summary，不含 detail/action/source）
@@ -83,10 +93,11 @@ type EntryListItemResponse struct {
 	Confidence      float64    `json:"confidence"`
 	Confirmations   int        `json:"confirmations"`
 	FlagsCount      int        `json:"flags_count"`
-	SupersededBy    *uuid.UUID `json:"superseded_by"`
-	LifecycleStatus string     `json:"lifecycle_status"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	SupersededBy    *uuid.UUID            `json:"superseded_by"`
+	QualityFlags    []QualityFlagResponse `json:"quality_flags"`
+	LifecycleStatus string                `json:"lifecycle_status"`
+	CreatedAt       time.Time             `json:"created_at"`
+	UpdatedAt       time.Time             `json:"updated_at"`
 }
 
 // PaginationResponse 分頁資訊回應

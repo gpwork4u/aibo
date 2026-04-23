@@ -18,6 +18,13 @@ type ClassifyResult struct {
 	Action   string           `json:"action"`  // 可執行的建議/行動
 }
 
+// QualityWarningResponse 品質警告回應
+type QualityWarningResponse struct {
+	Type     string `json:"type"`
+	Details  string `json:"details"`
+	Severity string `json:"severity"`
+}
+
 // ClassifyResponse 手動觸發分類的回應
 type ClassifyResponse struct {
 	Message string    `json:"message"`

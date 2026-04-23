@@ -25,10 +25,11 @@ type Entry struct {
 	IsArchived    bool             `json:"is_archived"`
 	Confidence    float64    `json:"confidence"`
 	Confirmations int        `json:"confirmations"`
-	FlagsCount    int        `json:"flags_count"`
-	SupersededBy  *uuid.UUID `json:"superseded_by"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	FlagsCount    int            `json:"flags_count"`
+	SupersededBy  *uuid.UUID     `json:"superseded_by"`
+	QualityFlags  []QualityFlag  `json:"quality_flags"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
 }
 
 // LifecycleStatus 計算知識條目的生命週期狀態
@@ -58,10 +59,11 @@ type EntryListItem struct {
 	IsArchived     bool             `json:"is_archived"`
 	Confidence     float64    `json:"confidence"`
 	Confirmations  int        `json:"confirmations"`
-	FlagsCount     int        `json:"flags_count"`
-	SupersededBy   *uuid.UUID `json:"superseded_by"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	FlagsCount     int            `json:"flags_count"`
+	SupersededBy   *uuid.UUID     `json:"superseded_by"`
+	QualityFlags   []QualityFlag  `json:"quality_flags"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 // LifecycleStatus 計算列表條目的生命週期狀態
