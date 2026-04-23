@@ -92,6 +92,7 @@ func main() {
 
 	// 初始化 Git 匯入服務
 	gitImportSvc := service.NewGitImportService(entryRepo)
+	gitImportSvc.SetAllowedRepoPaths(cfg.AllowedRepoPaths)
 	gitImportHandler := handler.NewGitImportHandler(gitImportSvc)
 
 	// 初始化 Google Calendar 整合服務

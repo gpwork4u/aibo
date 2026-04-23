@@ -32,12 +32,21 @@ var (
 
 // GitImportService Git 匯入業務邏輯
 type GitImportService struct {
-	entryRepo *repository.EntryRepository
+	entryRepo        *repository.EntryRepository
+	allowedRepoPaths []string
 }
 
 // NewGitImportService 建立新的 GitImportService
 func NewGitImportService(entryRepo *repository.EntryRepository) *GitImportService {
 	return &GitImportService{entryRepo: entryRepo}
+}
+
+// SetAllowedRepoPaths 設定允許的 repo 路徑白名單
+func (s *GitImportService) SetAllowedRepoPaths(paths []string) {
+	s.allowedRepoPaths = paths
+	if len(paths) == 0 {
+		slog.Warn("ALLOWED_REPO_PATHS 未設定，允許匯入任何路徑")
+	}
 }
 
 // commitInfo 暫存 commit 資訊
@@ -55,6 +64,11 @@ func (s *GitImportService) ImportCommits(ctx context.Context, req dto.GitImportR
 	// 驗證 repo_path
 	if strings.TrimSpace(req.RepoPath) == "" {
 		return nil, model.NewAppError(400, model.ErrCodeInvalidInput, "repo_path 不可為空")
+	}
+
+	// 驗證 repo_path 是否在白名單內
+	if err := s.validateRepoPath(req.RepoPath); err != nil {
+		return nil, err
 	}
 
 	// 開啟 repo
@@ -284,4 +298,25 @@ func extractSubject(message string) string {
 		subject = string(runes[:77]) + "..."
 	}
 	return subject
+}
+
+// validateRepoPath 驗證 repo_path 是否在白名單允許的路徑範圍內
+func (s *GitImportService) validateRepoPath(repoPath string) error {
+	// 白名單為空時允許所有路徑（向下相容）
+	if len(s.allowedRepoPaths) == 0 {
+		return nil
+	}
+
+	// 先清理路徑（防止 .. 目錄遍歷）
+	cleanPath := filepath.Clean(repoPath)
+
+	for _, allowed := range s.allowedRepoPaths {
+		allowedClean := filepath.Clean(allowed)
+		// 檢查 cleanPath 是否在 allowedClean 目錄下
+		if strings.HasPrefix(cleanPath, allowedClean+string(filepath.Separator)) || cleanPath == allowedClean {
+			return nil
+		}
+	}
+
+	return model.NewAppError(403, model.ErrCodeInvalidInput, "repo_path 不在允許的路徑範圍內")
 }
