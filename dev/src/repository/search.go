@@ -47,7 +47,7 @@ type SearchParams struct {
 }
 
 // Search 執行加權全文搜尋
-// 使用 tsvector 加權搜尋（title:A, tags:A, content:B）+ trgm 模糊比對
+// 使用 tsvector 加權搜尋（title:A, tags:A, content:B）+ pg_bigm LIKE 模糊比對
 // 多個關鍵字以 OR 邏輯搜尋，ts_rank 取最高分
 func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]SearchResult, int, error) {
 	if len(params.Keywords) == 0 {
@@ -72,9 +72,10 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 			   setweight(to_tsvector('simple', coalesce(array_to_string(e.tags, ' '), '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'))
 			  @@ plainto_tsquery('simple', $%d)
-			 OR (coalesce(e.summary,'') || ' ' || coalesce(e.title,'') || ' ' || coalesce(e.content,'')) %% $%d
+			 OR (coalesce(e.summary,'') || ' ' || coalesce(e.title,'') || ' ' || coalesce(e.content,''))
+			    LIKE '%%' || $%d || '%%' ESCAPE '\\'
 			 OR EXISTS (SELECT 1 FROM unnest(e.tags) AS t WHERE t ILIKE '%%' || $%d || '%%' ESCAPE '\\'))`,
-			kwIdx, kwIdx, escapedKwIdx,
+			kwIdx, escapedKwIdx, escapedKwIdx,
 		))
 		args = append(args, kw, escapeLikePattern(kw))
 		argIdx += 2
