@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -40,7 +41,7 @@ func (h *EntryHandler) Create(c *gin.Context) {
 		c.Request.Context(),
 		req.Title, req.Content, req.CategoryID,
 		req.Source, req.SourceType, req.SourceRef,
-		req.Tags,
+		req.Tags, req.Domains, req.Context,
 	)
 	if err != nil {
 		handleEntryError(c, err)
@@ -97,6 +98,23 @@ func (h *EntryHandler) List(c *gin.Context) {
 	// 解析 tag（可多個，AND 邏輯）
 	filter.Tags = c.QueryArray("tag")
 
+	// 解析 domain（可多個，AND 邏輯）
+	filter.Domains = c.QueryArray("domain")
+
+	// 解析 context.* 過濾參數
+	contextFilter := make(map[string][]string)
+	for key, values := range c.Request.URL.Query() {
+		if strings.HasPrefix(key, "context.") {
+			subKey := strings.TrimPrefix(key, "context.")
+			if subKey != "" {
+				contextFilter[subKey] = values
+			}
+		}
+	}
+	if len(contextFilter) > 0 {
+		filter.ContextFilter = contextFilter
+	}
+
 	// 解析 is_archived
 	if archivedStr := c.Query("is_archived"); archivedStr != "" {
 		archived, err := strconv.ParseBool(archivedStr)
@@ -141,6 +159,10 @@ func (h *EntryHandler) List(c *gin.Context) {
 		if tags == nil {
 			tags = []string{}
 		}
+		domains := item.Domains
+		if domains == nil {
+			domains = []string{}
+		}
 		items = append(items, dto.EntryListItemResponse{
 			ID:              item.ID,
 			Title:           item.Title,
@@ -148,6 +170,8 @@ func (h *EntryHandler) List(c *gin.Context) {
 			ContentPreview:  item.ContentPreview,
 			CategoryID:      item.CategoryID,
 			Tags:            tags,
+			Domains:         domains,
+			Context:         item.Context,
 			IsArchived:      item.IsArchived,
 			Confidence:      item.Confidence,
 			Confirmations:   item.Confirmations,
@@ -365,6 +389,40 @@ func (h *EntryHandler) Update(c *gin.Context) {
 		}
 	}
 
+	if v, ok := rawMap["domains"]; ok {
+		if string(v) == "null" {
+			updates["domains"] = nil
+		} else {
+			var domains []string
+			if err := json.Unmarshal(v, &domains); err != nil {
+				c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+					Code:    model.ErrCodeInvalidInput,
+					Message: "domains 格式錯誤，須為字串陣列",
+				})
+				return
+			}
+			updates["domains"] = domains
+		}
+	}
+
+	if v, ok := rawMap["context"]; ok {
+		if string(v) == "null" {
+			updates["context"] = nil
+		} else {
+			// 驗證是合法 JSON object
+			var obj map[string]interface{}
+			if err := json.Unmarshal(v, &obj); err != nil {
+				c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+					Code:    model.ErrCodeInvalidInput,
+					Message: "context 格式錯誤，須為 JSON 物件",
+				})
+				return
+			}
+			raw := json.RawMessage(v)
+			updates["context"] = &raw
+		}
+	}
+
 	if v, ok := rawMap["is_archived"]; ok {
 		var b bool
 		if err := json.Unmarshal(v, &b); err != nil {
@@ -408,6 +466,10 @@ func toEntryResponse(entry *model.Entry) dto.EntryResponse {
 	if tags == nil {
 		tags = []string{}
 	}
+	domains := entry.Domains
+	if domains == nil {
+		domains = []string{}
+	}
 	return dto.EntryResponse{
 		ID:              entry.ID,
 		Title:           entry.Title,
@@ -420,6 +482,8 @@ func toEntryResponse(entry *model.Entry) dto.EntryResponse {
 		SourceType:      entry.SourceType,
 		SourceRef:       entry.SourceRef,
 		Tags:            tags,
+		Domains:         domains,
+		Context:         entry.Context,
 		IsArchived:      entry.IsArchived,
 		Confidence:      entry.Confidence,
 		Confirmations:   entry.Confirmations,

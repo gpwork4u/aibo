@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -72,10 +73,32 @@ func (h *SearchHandler) SmartSearch(c *gin.Context) {
 		categoryID = &parsed
 	}
 
+	// 解析 context_filter 為 map[string][]string
+	contextFilter := make(map[string][]string)
+	for key, raw := range req.ContextFilter {
+		// 嘗試解析為 []string
+		var arr []string
+		if err := json.Unmarshal(raw, &arr); err != nil {
+			// 嘗試解析為 string
+			var s string
+			if err := json.Unmarshal(raw, &s); err != nil {
+				c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+					Code:    model.ErrCodeInvalidInput,
+					Message: "context_filter 值格式錯誤，須為字串或字串陣列",
+				})
+				return
+			}
+			arr = []string{s}
+		}
+		contextFilter[key] = arr
+	}
+
 	result, err := h.searchSvc.SmartSearch(c.Request.Context(), service.SmartSearchInput{
-		Query:      req.Query,
-		CategoryID: categoryID,
-		Limit:      limit,
+		Query:         req.Query,
+		CategoryID:    categoryID,
+		Domains:       req.Domains,
+		ContextFilter: contextFilter,
+		Limit:         limit,
 	})
 	if err != nil {
 		handleSearchError(c, err)
@@ -89,12 +112,18 @@ func (h *SearchHandler) SmartSearch(c *gin.Context) {
 		if tags == nil {
 			tags = []string{}
 		}
+		domains := r.Domains
+		if domains == nil {
+			domains = []string{}
+		}
 		items = append(items, dto.SearchResultItem{
 			EntryID:         r.EntryID,
 			Title:           r.Title,
 			Summary:         r.Summary,
 			ContentPreview:  r.ContentPreview,
 			Tags:            tags,
+			Domains:         domains,
+			Context:         r.Context,
 			LifecycleStatus: r.LifecycleStatus,
 			SupersededBy:    r.SupersededBy,
 			Relevance:       r.Relevance,
@@ -144,6 +173,20 @@ func (h *SearchHandler) SimpleSearch(c *gin.Context) {
 	// 解析 tags
 	tags := c.QueryArray("tag")
 
+	// 解析 domains
+	domains := c.QueryArray("domain")
+
+	// 解析 context.* 過濾參數
+	simpleContextFilter := make(map[string][]string)
+	for key, values := range c.Request.URL.Query() {
+		if strings.HasPrefix(key, "context.") {
+			subKey := strings.TrimPrefix(key, "context.")
+			if subKey != "" {
+				simpleContextFilter[subKey] = values
+			}
+		}
+	}
+
 	// 解析 limit
 	limit := 10
 	if limitStr := c.Query("limit"); limitStr != "" {
@@ -173,11 +216,13 @@ func (h *SearchHandler) SimpleSearch(c *gin.Context) {
 	}
 
 	result, err := h.searchSvc.SimpleSearch(c.Request.Context(), service.SimpleSearchInput{
-		Query:      q,
-		CategoryID: categoryID,
-		Tags:       tags,
-		Limit:      limit,
-		Offset:     offset,
+		Query:         q,
+		CategoryID:    categoryID,
+		Tags:          tags,
+		Domains:       domains,
+		ContextFilter: simpleContextFilter,
+		Limit:         limit,
+		Offset:        offset,
 	})
 	if err != nil {
 		handleSearchError(c, err)
@@ -191,12 +236,18 @@ func (h *SearchHandler) SimpleSearch(c *gin.Context) {
 		if tags == nil {
 			tags = []string{}
 		}
+		domains := r.Domains
+		if domains == nil {
+			domains = []string{}
+		}
 		items = append(items, dto.SimpleSearchResultItem{
 			EntryID:         r.EntryID,
 			Title:           r.Title,
 			Summary:         r.Summary,
 			ContentPreview:  r.ContentPreview,
 			Tags:            tags,
+			Domains:         domains,
+			Context:         r.Context,
 			LifecycleStatus: r.LifecycleStatus,
 			SupersededBy:    r.SupersededBy,
 			Relevance:       r.Relevance,

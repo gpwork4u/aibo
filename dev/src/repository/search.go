@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -24,6 +25,8 @@ type SearchResult struct {
 	Summary        *string
 	ContentPreview *string
 	Tags           []string
+	Domains        []string
+	Context        *json.RawMessage
 	Confidence     float64
 	SupersededBy   *uuid.UUID
 	Relevance      float64
@@ -41,11 +44,13 @@ func NewSearchRepository(pool *pgxpool.Pool) *SearchRepository {
 
 // SearchParams 搜尋參數
 type SearchParams struct {
-	Keywords   []string   // 搜尋關鍵字（原始 query + 同義詞）
-	CategoryID *uuid.UUID // 可選的分類過濾
-	Tags       []string   // 可選的 tag 過濾（AND 邏輯）
-	Limit      int        // 回傳數量上限
-	Offset     int        // 分頁偏移
+	Keywords      []string            // 搜尋關鍵字（原始 query + 同義詞）
+	CategoryID    *uuid.UUID          // 可選的分類過濾
+	Tags          []string            // 可選的 tag 過濾（AND 邏輯）
+	Domains       []string            // 可選的 domain 過濾（AND 邏輯）
+	ContextFilter map[string][]string // 可選的 context 子欄位過濾
+	Limit         int                 // 回傳數量上限
+	Offset        int                 // 分頁偏移
 }
 
 // Search 執行加權全文搜尋
@@ -72,6 +77,7 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 			`((setweight(to_tsvector('simple', coalesce(e.summary, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.title, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(array_to_string(e.tags, ' '), '')), 'A') ||
+			   setweight(to_tsvector('simple', coalesce(array_to_string(e.domains, ' '), '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'))
 			  @@ plainto_tsquery('simple', $%d)
 			 OR (coalesce(e.summary,'') || ' ' || coalesce(e.title,'') || ' ' || coalesce(e.content,''))
@@ -98,6 +104,22 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 		argIdx++
 	}
 
+	// domain 過濾（AND 邏輯）
+	if len(params.Domains) > 0 {
+		conditions = append(conditions, fmt.Sprintf("e.domains @> $%d::text[]", argIdx))
+		args = append(args, params.Domains)
+		argIdx++
+	}
+
+	// context 子欄位過濾
+	for key, values := range params.ContextFilter {
+		jsonObj := map[string][]string{key: values}
+		jsonBytes, _ := json.Marshal(jsonObj)
+		conditions = append(conditions, fmt.Sprintf("e.context @> $%d::jsonb", argIdx))
+		args = append(args, string(jsonBytes))
+		argIdx++
+	}
+
 	whereClause := "WHERE " + strings.Join(conditions, " AND ")
 
 	// 建構 ts_rank：取所有關鍵字中最高的 rank
@@ -108,6 +130,7 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 			   setweight(to_tsvector('simple', coalesce(e.summary, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.title, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(array_to_string(e.tags, ' '), '')), 'A') ||
+			   setweight(to_tsvector('simple', coalesce(array_to_string(e.domains, ' '), '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'),
 			   plainto_tsquery('simple', $%d)
 			 )`, kwIdx,
@@ -130,7 +153,7 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 	// 查詢資料（relevance = ts_rank * confidence）
 	dataQuery := fmt.Sprintf(
 		`SELECT e.id, e.title, e.summary, LEFT(e.content, 200) AS content_preview,
-		        e.tags, e.confidence, e.superseded_by, (%s * e.confidence) AS relevance
+		        e.tags, e.domains, e.context, e.confidence, e.superseded_by, (%s * e.confidence) AS relevance
 		 FROM entries e
 		 %s
 		 ORDER BY relevance DESC, e.created_at DESC
@@ -150,7 +173,7 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 		var item SearchResult
 		if err := rows.Scan(
 			&item.EntryID, &item.Title, &item.Summary, &item.ContentPreview,
-			&item.Tags, &item.Confidence, &item.SupersededBy, &item.Relevance,
+			&item.Tags, &item.Domains, &item.Context, &item.Confidence, &item.SupersededBy, &item.Relevance,
 		); err != nil {
 			return nil, 0, err
 		}

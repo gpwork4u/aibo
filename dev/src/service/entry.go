@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,7 +22,7 @@ func NewEntryService(repo *repository.EntryRepository) *EntryService {
 
 // Create 建立新知識條目
 func (s *EntryService) Create(ctx context.Context, title, content *string, categoryID *uuid.UUID,
-	source, sourceType, sourceRef *string, tags []string) (*model.Entry, error) {
+	source, sourceType, sourceRef *string, tags []string, domains []string, entryContext *json.RawMessage) (*model.Entry, error) {
 
 	// 驗證 title 和 content 至少一個非空
 	if (title == nil || *title == "") && (content == nil || *content == "") {
@@ -71,6 +72,9 @@ func (s *EntryService) Create(ctx context.Context, title, content *string, categ
 	if tags == nil {
 		tags = []string{}
 	}
+	if domains == nil {
+		domains = []string{}
+	}
 
 	now := time.Now().UTC()
 	entry := &model.Entry{
@@ -82,6 +86,8 @@ func (s *EntryService) Create(ctx context.Context, title, content *string, categ
 		SourceType:    sourceType,
 		SourceRef:     sourceRef,
 		Tags:          tags,
+		Domains:       domains,
+		Context:       entryContext,
 		IsArchived:    false,
 		Confidence:    0.5,
 		Confirmations: 0,
@@ -250,6 +256,22 @@ func (s *EntryService) Update(ctx context.Context, id uuid.UUID, updates map[str
 			existing.Tags = []string{}
 		} else {
 			existing.Tags = v.([]string)
+		}
+	}
+
+	if v, ok := updates["domains"]; ok {
+		if v == nil {
+			existing.Domains = []string{}
+		} else {
+			existing.Domains = v.([]string)
+		}
+	}
+
+	if v, ok := updates["context"]; ok {
+		if v == nil {
+			existing.Context = nil
+		} else {
+			existing.Context = v.(*json.RawMessage)
 		}
 	}
 
