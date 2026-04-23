@@ -813,3 +813,168 @@ Sprint 3 新增 3 個依賴（go-git、google-api-go-client、oauth2）。
 | Google API quota 限制 | Calendar 事件列表被拒 | 單次最多 500 events、使用 singleEvents=true 避免重複請求 |
 | Refresh token 過期或被撤銷 | 匯入失敗 | GCAL_TOKEN_EXPIRED 錯誤碼引導使用者重新授權 |
 | Docker 容器內無法存取宿主機 Git repo | F-008 功能受限 | 文件說明需掛載 volume、或使用 host network |
+
+---
+
+# Sprint 4 技術選型補充調查
+
+## 調查日期
+2026-04-22
+
+## 22. MCP Server SDK（Golang）
+
+### 候選方案
+
+| 方案 | GitHub Stars | 版本 | 維護者 | 優點 | 缺點 |
+|------|-------------|------|--------|------|------|
+| mark3labs/mcp-go | 8.6k+ | v1.0.0 | 社群（mark3labs） | 社群最廣泛採用、API 簡潔直觀、支援 stdio/SSE/StreamableHTTP、文件完善 | 非官方維護 |
+| modelcontextprotocol/go-sdk | 4.4k+ | v1.5.0 | 官方 + Google | 官方維護、嚴格 spec 合規、型別安全 | 較新、社群範例較少、Go 版本需求較高 |
+| metoro-io/mcp-golang | 2k+ | 持續更新 | 社群（metoro-io） | 型別安全的 tool argument structs、自動 schema 生成 | 社群較小 |
+
+### 決策
+選擇 **mark3labs/mcp-go**
+
+### 理由
+1. **社群最廣泛採用**：8.6k stars，Go 生態中 MCP SDK 的事實標準，遇到問題容易找到解法
+2. **API 簡潔**：`server.NewMCPServer()` + `mcp.NewTool()` + `server.ServeStdio()` 三步完成，boilerplate 極少
+3. **Transport 完整**：同時支援 stdio（Claude Code/Cursor 本地使用）、SSE、StreamableHTTP，未來擴展性好
+4. **與專案技術棧一致**：純 Go 實作，不引入 CGO 或外部依賴
+5. **實戰驗證**：已有大量 production MCP server 使用此 SDK
+
+### MCP Server 架構決策
+
+**獨立 binary 模式**：MCP server 作為獨立的 CLI binary（`aibo-mcp`），透過 HTTP 呼叫既有 aibo API。
+
+理由：
+- 不需要修改現有 Gin server 架構
+- MCP server 只是一個「客戶端包裝」
+- 分離關注點：API server 管資料，MCP server 管協定轉換
+- 部署靈活：MCP binary 裝在使用者本機，API server 可在本機或遠端
+
+### 使用方式
+
+```go
+import (
+    "github.com/mark3labs/mcp-go/mcp"
+    "github.com/mark3labs/mcp-go/server"
+)
+
+// 建立 MCP server
+s := server.NewMCPServer(
+    "aibo",
+    "1.0.0",
+    server.WithToolCapabilities(false),
+)
+
+// 註冊 tool
+queryTool := mcp.NewTool("aibo_query",
+    mcp.WithDescription("搜尋使用者的個人知識庫"),
+    mcp.WithString("query", mcp.Required(), mcp.Description("搜尋查詢")),
+    mcp.WithString("category", mcp.Description("限定分類")),
+    mcp.WithNumber("limit", mcp.Description("回傳數量上限")),
+)
+s.AddTool(queryTool, queryHandler)
+
+// stdio transport
+server.ServeStdio(s)
+```
+
+### 參考資料
+- [mark3labs/mcp-go GitHub](https://github.com/mark3labs/mcp-go)
+- [MCP-Go Getting Started](https://mcp-go.dev/getting-started/)
+- [modelcontextprotocol/go-sdk GitHub](https://github.com/modelcontextprotocol/go-sdk)
+- [Build MCP Servers in Go - Complete Guide](https://mcpcat.io/guides/building-mcp-server-go/)
+
+---
+
+## 23. MCP Transport 選型
+
+### 候選方案
+
+| Transport | 適用場景 | Claude Code 支援 | Cursor 支援 | 部署要求 |
+|-----------|---------|-----------------|------------|---------|
+| stdio | 本地 CLI 工具 | 原生支援 | 原生支援 | binary 在本機 |
+| SSE | Web 應用 | 需配置 | 需配置 | HTTP server |
+| StreamableHTTP | 遠端服務 | 需配置 | 需配置 | HTTP server |
+
+### 決策
+選擇 **stdio** 作為主要 transport
+
+### 理由
+1. **Claude Code / Cursor 原生支援**：在 MCP 設定中指定 command 即可，零配置
+2. **最簡部署**：只需一個 binary，不需要額外啟動 HTTP server
+3. **安全性**：不開放網路端口，MCP server 跟 client 同機執行
+4. **aibo 使用場景**：個人工具，本地執行為主，stdio 完全匹配
+
+---
+
+## 24. 知識結構 Migration 策略
+
+### 需求
+為 entries table 新增 summary/detail/action 三個 TEXT 欄位，不影響現有資料。
+
+### 策略
+使用 `ALTER TABLE ADD COLUMN ... NULL` -- PostgreSQL 中 ADD COLUMN with NULL default 是 O(1) 操作，不需要 rewrite table。
+
+### 關鍵考量
+
+| 考量 | 分析 | 決策 |
+|------|------|------|
+| 資料遷移 | 現有 entries 的 summary/detail/action 為 NULL | 不做資料回填，新建/重新分類時自動填入 |
+| 索引更新 | 全文搜尋索引需包含 summary | DROP + CREATE INDEX（migration 中執行） |
+| 向下相容 | 舊版 client 不認識新欄位 | JSON 回應新增欄位，舊 client 自動忽略 |
+| LLM prompt | 分類 prompt 需同時產生 summary/detail/action | prompt 更新，但 parse 失敗時 fallback 為舊格式 |
+
+### 注意事項
+- PostgreSQL ALTER TABLE ADD COLUMN NULL 不會鎖表，對 production 安全
+- DROP INDEX + CREATE INDEX 會短暫影響搜尋效能，但個人知識庫規模下可忽略
+- 建議在低流量時段執行 migration
+
+### 參考資料
+- [PostgreSQL ALTER TABLE Performance](https://www.postgresql.org/docs/current/sql-altertable.html)
+- [Safe database migrations at scale](https://medium.com/paypal-tech/postgresql-at-scale-database-schema-changes-without-downtime-20d3749ed680)
+
+---
+
+## 25. 信心度搜尋排序策略
+
+### 需求
+搜尋排序需結合 ts_rank（文字相關度）和 confidence（信心度）。
+
+### 候選公式
+
+| 公式 | 優點 | 缺點 |
+|------|------|------|
+| ts_rank * confidence | 簡單直觀，信心度直接影響排序 | 新 entry（0.5）天然劣勢 |
+| ts_rank * (0.5 + 0.5 * confidence) | 信心度影響較溫和（0.5-1.0 倍） | 稍複雜 |
+| ts_rank + 0.2 * confidence | 加性模型，信心度是 bonus | 兩個量綱不同 |
+
+### 決策
+選擇 **ts_rank * confidence**
+
+### 理由
+1. **簡單直觀**：乘法模型意義明確 -- 信心度為 0 的條目永遠不會出現在搜尋結果最前面
+2. **新 entry 不會太差**：預設 confidence = 0.5，只會把 rank 減半，不會完全消失
+3. **符合直覺**：被多次 confirm 的知識排名自然上升，被 flag 的知識排名下降
+
+---
+
+## 26. Sprint 4 新增依賴
+
+| 用途 | Package | 選擇理由 |
+|------|---------|---------|
+| MCP Server SDK | github.com/mark3labs/mcp-go | 社群最廣泛、API 簡潔、支援 stdio transport |
+
+Sprint 4 僅新增 1 個依賴（mcp-go），用於 MCP server binary。主 API server 不新增依賴。
+
+---
+
+## 27. Sprint 4 技術風險與緩解
+
+| 風險 | 影響 | 緩解措施 |
+|------|------|---------|
+| mcp-go API 不穩定（v1.0.0） | MCP server 需跟隨更新 | 封裝 tool handler，隔離 SDK 細節 |
+| LLM 分類 prompt 變長導致回應品質下降 | summary/detail/action 品質不佳 | 先用現有 LLM provider 測試，品質不足時調整 prompt |
+| stdio MCP server 偵錯困難 | 開發期除錯不便 | 增加 slog 日誌到 stderr、使用 mcp-go 的 InProcess transport 做 unit test |
+| 搜尋排序 ts_rank * confidence 可能讓新 entry 排名過低 | 使用者找不到新加入的知識 | confidence 預設 0.5 而非 0，確保新 entry 有基本曝光 |
+| ALTER TABLE 索引重建影響搜尋 | migration 期間搜尋變慢 | 個人知識庫規模小，影響可忽略；若有疑慮可用 CONCURRENTLY |

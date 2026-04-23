@@ -266,3 +266,78 @@ F-008 相對簡單，預計先完成。
 | Entry model 缺少 source_type/source_ref 欄位 | 需補 migration | 確認 Sprint 1 的 Entry schema 已包含這些欄位 |
 | Docker 容器無法存取宿主機 Git repo | F-008 功能受限 | 文件說明 volume mount 方式 |
 | Google OAuth redirect URL 設定 | 授權流程失敗 | 環境變數配置 + 文件說明 |
+
+---
+
+# Sprint 4 依賴圖譜
+
+## 功能總覽
+
+| 編號 | 名稱 | 優先級 | 工作量 |
+|------|------|--------|-------|
+| F-011 | MCP Server 模式 | P0 | 大（獨立 binary + 5 個 tools） |
+| F-012 | 知識結構升級 | P0 | 中（DB migration + model/service/handler 修改） |
+| F-013 | 信心度機制 | P0 | 中（DB migration + 新 API endpoint） |
+
+## 依賴關係
+
+```
+F-012 (知識結構升級)  -- 無前置依賴
+F-013 (信心度機制)    -- 無前置依賴
+
+F-011 (MCP Server)
+├── F-012 (query tool 需要 summary/detail/action 欄位)
+└── F-013 (confirm/flag tool 需要對應 API)
+```
+
+## 依賴說明
+
+### F-012 與 F-013 互相獨立
+- F-012 修改 Entry model 新增 summary/detail/action 欄位 + 更新 LLM prompt + 搜尋索引
+- F-013 修改 Entry model 新增 confidence 欄位 + 新增 entry_flags table + confirm/flag API
+- 兩者操作不同欄位，migration 序號不同（006 和 007），可並行開發
+
+### F-011 依賴 F-012 + F-013
+- F-011 的 `aibo_query` tool 需要搜尋結果包含 summary/detail/action（F-012 產出）
+- F-011 的 `aibo_confirm` / `aibo_flag` tool 需要 POST /api/v1/entries/:id/confirm 和 POST /api/v1/entries/:id/flag API（F-013 產出）
+- F-011 作為獨立 binary 透過 HTTP 呼叫 API，不直接依賴程式碼層級
+
+## 拓撲排序
+
+### Wave 0（先行，可並行）
+- **F-012**: 知識結構升級（DB migration + model/dto/repository/service/handler 修改）
+- **F-013**: 信心度機制（DB migration + 新 API endpoint）
+- **QA**: 撰寫 E2E test script
+
+### Wave 1（Wave 0 完成後）
+- **F-011**: MCP Server 模式（獨立 binary，呼叫 F-012 + F-013 的 API）
+
+## 並行策略
+
+```
+時間線 ->
+
+Wave 0:  [F-012 知識結構升級 ────────────]
+         [F-013 信心度機制 ──────────────]
+         [QA 撰寫 test script ──────────]
+
+Wave 1:                    [F-011 MCP Server ──────────────]
+                           [QA 執行完整測試 ───────────────]
+
+Code Review:         [逐 PR 審查 ─────────────────────────]
+```
+
+## 關鍵路徑
+
+max(F-012, F-013) -> F-011
+
+F-012 和 F-013 並行，取較長者完成後開始 F-011。
+
+## 風險項目
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| F-012 和 F-013 同時修改 Entry model | 合併衝突 | 操作不同欄位，衝突小；先 merge 的 PR 另一邊 rebase |
+| mcp-go SDK API 不穩定 | MCP server 需修改 | 封裝 tool handler，隔離 SDK 細節 |
+| LLM prompt 變長導致回應品質下降 | summary/detail/action 品質不佳 | 調整 prompt、測試多種 LLM provider |
+| 搜尋排序公式影響使用體驗 | 新 entry 排名過低 | confidence 預設 0.5，確保基本曝光 |

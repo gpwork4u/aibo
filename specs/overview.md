@@ -48,6 +48,9 @@
 | F-008 | Git 整合 | Sprint 3 | P2 | `specs/features/f008-git-import.md` |
 | F-009 | Google Calendar 整合 | Sprint 3 | P2 | `specs/features/f009-gcal-import.md` |
 | F-010 | API Key 認證 | Sprint 1 | P0 | `specs/features/f010-api-key-auth.md` |
+| F-011 | MCP Server 模式 | Sprint 4 | P0 | `specs/features/f011-mcp-server.md` |
+| F-012 | 知識結構升級 | Sprint 4 | P0 | `specs/features/f012-knowledge-structure.md` |
+| F-013 | 信心度機制 | Sprint 4 | P0 | `specs/features/f013-confidence.md` |
 
 ## Sprint 規劃
 
@@ -65,6 +68,11 @@
 ### Sprint 3：外部整合
 - F-008 Git 整合
 - F-009 Google Calendar 整合
+
+### Sprint 4：AI 整合升級
+- F-011 MCP Server 模式
+- F-012 知識結構升級
+- F-013 信心度機制
 
 ## 非功能需求
 
