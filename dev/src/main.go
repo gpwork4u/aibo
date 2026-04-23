@@ -109,8 +109,13 @@ func main() {
 	searchSvc := service.NewSearchService(llmSvc, searchRepo)
 	searchHandler := handler.NewSearchHandler(searchSvc)
 
+	// 初始化統計服務
+	statsRepo := repository.NewStatsRepository(pool)
+	statsSvc := service.NewStatsService(statsRepo)
+	statsHandler := handler.NewStatsHandler(statsSvc)
+
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
