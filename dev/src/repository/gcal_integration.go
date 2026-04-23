@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/gpwork4u/aibo/model"
 	"github.com/jackc/pgx/v5"
@@ -77,6 +78,46 @@ func (r *GcalIntegrationRepository) UpdateTokens(ctx context.Context, id interfa
 		 SET access_token = $1, refresh_token = $2, token_expiry = $3, updated_at = NOW()
 		 WHERE id = $4`,
 		accessToken, refreshToken, expiry, id,
+	)
+	return err
+}
+
+// SaveOAuthState 儲存 OAuth state 到 DB
+func (r *GcalIntegrationRepository) SaveOAuthState(ctx context.Context, state string) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO oauth_states (state, created_at) VALUES ($1, NOW())`,
+		state,
+	)
+	return err
+}
+
+// ValidateOAuthState 驗證 OAuth state 是否存在且未過期（10 分鐘內），驗證後刪除
+func (r *GcalIntegrationRepository) ValidateOAuthState(ctx context.Context, state string) (bool, error) {
+	var createdAt time.Time
+	err := r.pool.QueryRow(ctx,
+		`DELETE FROM oauth_states WHERE state = $1 RETURNING created_at`,
+		state,
+	).Scan(&createdAt)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	// 檢查是否在 10 分鐘內
+	if time.Since(createdAt) > 10*time.Minute {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+// CleanExpiredOAuthStates 清理超過 10 分鐘的過期 state
+func (r *GcalIntegrationRepository) CleanExpiredOAuthStates(ctx context.Context) error {
+	_, err := r.pool.Exec(ctx,
+		`DELETE FROM oauth_states WHERE created_at < NOW() - INTERVAL '10 minutes'`,
 	)
 	return err
 }

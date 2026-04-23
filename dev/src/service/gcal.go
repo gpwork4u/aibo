@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,10 +34,6 @@ type GcalService struct {
 	entryRepo *repository.EntryRepository
 	aesCrypto *crypto.AESCrypto
 	config    *GcalConfig
-
-	// OAuth state 管理（記憶體中暫存）
-	stateMu sync.RWMutex
-	states  map[string]time.Time // state → 建立時間
 }
 
 // NewGcalService 建立新的 GcalService
@@ -53,7 +48,6 @@ func NewGcalService(
 		entryRepo: entryRepo,
 		aesCrypto: aesCrypto,
 		config:    config,
-		states:    make(map[string]time.Time),
 	}
 }
 
@@ -69,6 +63,7 @@ func (s *GcalService) oauthConfig() *oauth2.Config {
 }
 
 // StartOAuth 開始 OAuth 授權流程，回傳 auth_url
+// OAuth state 持久化到 DB，server 重啟後仍可驗證
 func (s *GcalService) StartOAuth() (string, error) {
 	if s.config.ClientID == "" || s.config.ClientSecret == "" {
 		return "", model.NewAppError(http.StatusInternalServerError, "INTERNAL_ERROR", "Google OAuth client 未設定")
@@ -79,13 +74,18 @@ func (s *GcalService) StartOAuth() (string, error) {
 		return "", fmt.Errorf("產生 state 失敗: %w", err)
 	}
 
-	// 儲存 state（10 分鐘後過期）
-	s.stateMu.Lock()
-	s.states[state] = time.Now()
-	s.stateMu.Unlock()
+	// 儲存 state 到 DB（持久化，重啟後不遺失）
+	ctx := context.Background()
+	if err := s.gcalRepo.SaveOAuthState(ctx, state); err != nil {
+		return "", fmt.Errorf("儲存 OAuth state 失敗: %w", err)
+	}
 
-	// 清理過期 states
-	go s.cleanExpiredStates()
+	// 背景清理過期 states
+	go func() {
+		if cleanErr := s.gcalRepo.CleanExpiredOAuthStates(context.Background()); cleanErr != nil {
+			slog.Error("清理過期 OAuth states 失敗", "error", cleanErr)
+		}
+	}()
 
 	authURL := s.oauthConfig().AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
 	return authURL, nil
@@ -93,21 +93,13 @@ func (s *GcalService) StartOAuth() (string, error) {
 
 // HandleCallback 處理 OAuth callback
 func (s *GcalService) HandleCallback(ctx context.Context, code, state string) (string, error) {
-	// 驗證 state
-	s.stateMu.Lock()
-	createdAt, exists := s.states[state]
-	if exists {
-		delete(s.states, state)
+	// 驗證 state（從 DB 查詢並刪除，同時檢查是否過期）
+	valid, err := s.gcalRepo.ValidateOAuthState(ctx, state)
+	if err != nil {
+		return "", fmt.Errorf("驗證 OAuth state 失敗: %w", err)
 	}
-	s.stateMu.Unlock()
-
-	if !exists {
-		return "", model.NewAppError(http.StatusBadRequest, model.ErrCodeInvalidInput, "無效的 state 參數")
-	}
-
-	// 檢查 state 是否過期（10 分鐘）
-	if time.Since(createdAt) > 10*time.Minute {
-		return "", model.NewAppError(http.StatusBadRequest, model.ErrCodeInvalidInput, "state 已過期，請重新授權")
+	if !valid {
+		return "", model.NewAppError(http.StatusBadRequest, model.ErrCodeInvalidInput, "無效或已過期的 state 參數")
 	}
 
 	// 交換 code 取得 token
@@ -355,15 +347,3 @@ func generateRandomState() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-// cleanExpiredStates 清理過期的 state（超過 10 分鐘）
-func (s *GcalService) cleanExpiredStates() {
-	s.stateMu.Lock()
-	defer s.stateMu.Unlock()
-
-	now := time.Now()
-	for state, createdAt := range s.states {
-		if now.Sub(createdAt) > 10*time.Minute {
-			delete(s.states, state)
-		}
-	}
-}
