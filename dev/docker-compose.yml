@@ -1,6 +1,8 @@
 services:
   db:
-    image: postgres:16-alpine
+    build:
+      context: ../docker/postgres
+      dockerfile: Dockerfile
     environment:
       POSTGRES_DB: aibo
       POSTGRES_USER: aibo

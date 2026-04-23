@@ -10,7 +10,7 @@ import (
 )
 
 // Setup 設定路由
-func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler) *gin.Engine {
+func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler) *gin.Engine {
 	r := gin.Default()
 
 	// 健康檢查（不需認證）
@@ -93,6 +93,12 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 
 		// 統計
 		v1.GET("/stats", statsHandler.GetStats)
+
+		// 系統資訊
+		system := v1.Group("/system")
+		{
+			system.GET("/search-config", systemHandler.GetSearchConfig)
+		}
 	}
 
 	return r

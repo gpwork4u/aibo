@@ -114,8 +114,13 @@ func main() {
 	statsSvc := service.NewStatsService(statsRepo)
 	statsHandler := handler.NewStatsHandler(statsSvc)
 
+	// 初始化系統資訊服務
+	systemRepo := repository.NewSystemRepository(pool)
+	systemSvc := service.NewSystemService(systemRepo)
+	systemHandler := handler.NewSystemHandler(systemSvc)
+
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{

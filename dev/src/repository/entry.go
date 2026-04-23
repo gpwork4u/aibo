@@ -109,20 +109,22 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 	if filter.Search != "" {
 		hasSearch = true
 		searchArgIdx = argIdx
-		// 加權 tsvector 全文搜尋 + pg_trgm 模糊搜尋 + tag ILIKE
+		// 加權 tsvector 全文搜尋 + pg_bigm LIKE 模糊搜尋 + tag ILIKE
+		escapedArgIdx := argIdx + 1
 		searchCondition := fmt.Sprintf(
 			`((setweight(to_tsvector('simple', coalesce(e.summary, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.title, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(array_to_string(e.tags, ' '), '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'))
 			  @@ plainto_tsquery('simple', $%d)
-			 OR (coalesce(e.summary,'') || ' ' || coalesce(e.title,'') || ' ' || coalesce(e.content,'')) %% $%d
-			 OR EXISTS (SELECT 1 FROM unnest(e.tags) AS t WHERE t ILIKE '%%' || $%d || '%%'))`,
-			argIdx, argIdx, argIdx,
+			 OR (coalesce(e.summary,'') || ' ' || coalesce(e.title,'') || ' ' || coalesce(e.content,''))
+			    LIKE '%%' || $%d || '%%' ESCAPE '\\'
+			 OR EXISTS (SELECT 1 FROM unnest(e.tags) AS t WHERE t ILIKE '%%' || $%d || '%%' ESCAPE '\\'))`,
+			argIdx, escapedArgIdx, escapedArgIdx,
 		)
 		conditions = append(conditions, searchCondition)
-		args = append(args, filter.Search)
-		argIdx++
+		args = append(args, filter.Search, escapeLikePattern(filter.Search))
+		argIdx += 2
 	}
 
 	// 建構 WHERE 子句
