@@ -74,17 +74,20 @@ func (s *EntryService) Create(ctx context.Context, title, content *string, categ
 
 	now := time.Now().UTC()
 	entry := &model.Entry{
-		ID:         uuid.New(),
-		Title:      title,
-		Content:    content,
-		CategoryID: categoryID,
-		Source:     source,
-		SourceType: sourceType,
-		SourceRef:  sourceRef,
-		Tags:       tags,
-		IsArchived: false,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ID:            uuid.New(),
+		Title:         title,
+		Content:       content,
+		CategoryID:    categoryID,
+		Source:        source,
+		SourceType:    sourceType,
+		SourceRef:     sourceRef,
+		Tags:          tags,
+		IsArchived:    false,
+		Confidence:    0.5,
+		Confirmations: 0,
+		FlagsCount:    0,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 
 	if err := s.repo.Create(ctx, entry); err != nil {
@@ -270,4 +273,31 @@ func (s *EntryService) Update(ctx context.Context, id uuid.UUID, updates map[str
 // Delete 硬刪除知識條目
 func (s *EntryService) Delete(ctx context.Context, id uuid.UUID) error {
 	return s.repo.Delete(ctx, id)
+}
+
+// ConfirmEntry 確認知識條目有用
+func (s *EntryService) ConfirmEntry(ctx context.Context, id uuid.UUID) (*model.Entry, error) {
+	return s.repo.ConfirmEntry(ctx, id)
+}
+
+// FlagEntry 標記知識條目問題
+func (s *EntryService) FlagEntry(ctx context.Context, id uuid.UUID, reason string, note *string) (*model.Entry, *model.EntryFlag, error) {
+	// 驗證 reason
+	if !model.ValidFlagReasons[reason] {
+		return nil, nil, model.NewAppError(400, model.ErrCodeInvalidInput, "無效的 reason，允許值：outdated, inaccurate, incomplete, duplicate")
+	}
+	return s.repo.FlagEntry(ctx, id, reason, note)
+}
+
+// GetFlags 取得知識條目的所有 flag 記錄
+func (s *EntryService) GetFlags(ctx context.Context, entryID uuid.UUID) ([]model.EntryFlag, error) {
+	// 先確認 entry 存在
+	entry, err := s.repo.FindByID(ctx, entryID)
+	if err != nil {
+		return nil, err
+	}
+	if entry == nil {
+		return nil, model.NewAppError(404, model.ErrCodeNotFound, "知識條目不存在")
+	}
+	return s.repo.GetFlags(ctx, entryID)
 }

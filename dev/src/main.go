@@ -87,6 +87,7 @@ func main() {
 	classifierWorker.Start()
 
 	entryHandler := handler.NewEntryHandler(entrySvc, classifierWorker)
+	confidenceHandler := handler.NewConfidenceHandler(entrySvc)
 	classifyHandler := handler.NewClassifyHandler(classifierSvc, classifierWorker, entryRepo)
 
 	// 初始化 Git 匯入服務
@@ -109,7 +110,7 @@ func main() {
 	searchHandler := handler.NewSearchHandler(searchSvc)
 
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{

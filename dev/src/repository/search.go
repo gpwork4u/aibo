@@ -124,10 +124,10 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 		return []SearchResult{}, 0, nil
 	}
 
-	// 查詢資料
+	// 查詢資料（relevance = ts_rank * confidence）
 	dataQuery := fmt.Sprintf(
 		`SELECT e.id, e.title, e.summary, LEFT(e.content, 200) AS content_preview,
-		        e.tags, %s AS relevance
+		        e.tags, (%s * e.confidence) AS relevance
 		 FROM entries e
 		 %s
 		 ORDER BY relevance DESC, e.created_at DESC
