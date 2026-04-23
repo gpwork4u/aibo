@@ -435,3 +435,107 @@ Sprint 5 關鍵路徑長度 = F-016 + F-014。
 | F-014 和 F-016 搜尋 SQL 合併衝突 | 開發延遲 | F-016 先 merge，F-014 基於 F-016 分支開發 |
 | F-014 和 F-015 都修改搜尋結果 DTO | 合併衝突 | 操作不同欄位，衝突小；先 merge 的 PR 另一邊 rebase |
 | LLM prompt 增加 domains/context 後品質下降 | 分類結果不佳 | 分離 prompt 或分步驟呼叫 LLM |
+
+---
+
+# Sprint 6 依賴圖譜
+
+## 功能總覽
+
+| 編號 | 名稱 | 優先級 | 工作量 |
+|------|------|--------|-------|
+| F-017 | LLM Client 連線池 | P0 | 小 |
+| F-018 | Service Interface 化 | P0 | 中（影響檔案多，但每個改動小） |
+| F-019 | 品質檢測（PII 偵測） | P1 | 中 |
+| F-020 | 小項修復 | P1 | 中（多個獨立小項） |
+
+## 依賴關係
+
+```
+Sprint 1-5 已完成基礎設施
+├── LLM Service（llm.go）
+├── Repository 層（所有 *Repository struct）
+├── Classifier Service（classifier.go）
+├── GCal Service（gcal.go）
+└── Git Import Service（git_import.go）
+
+Sprint 6 新功能（全部可並行）
+
+F-017 (LLM Client 連線池)  ── 無前置依賴
+    └── 修改 service/llm.go + service/llm_provider.go
+
+F-018 (Service Interface 化)  ── 無前置依賴
+    └── 新增 service/interfaces.go
+    └── 修改所有 service/*.go 的構造函式
+
+F-019 (品質檢測)  ── 無前置依賴
+    └── 新增 service/quality.go
+    └── 修改 service/classifier.go + model/entry.go
+
+F-020 (小項修復)  ── 無前置依賴
+    ├── 20-A: rate limiter per provider（由 F-017 涵蓋）
+    ├── 20-B: OAuth state 持久化（修改 gcal.go + migration）
+    ├── 20-C: env 啟動驗證（修改 config.go）
+    ├── 20-D: repo_path 安全（修改 git_import.go + config.go）
+    └── 20-E: Go 版本對齊（go.mod + Dockerfile）
+```
+
+## 依賴說明
+
+### 四個 Feature 互相獨立
+- F-017 修改 llm.go 的 client 建立邏輯
+- F-018 修改所有 service 的構造函式簽名
+- F-019 新增 quality.go，修改 classifier.go 的分類流程
+- F-020 的各子項分別修改不同檔案
+
+### 潛在合併衝突
+- **F-017 和 F-018**：F-017 修改 LlmService struct，F-018 也修改 LlmService 的依賴型別。建議 F-017 先 merge，F-018 基於 F-017 調整。
+- **F-018 和 F-019**：F-019 修改 classifier.go，F-018 也修改 classifier.go 的構造函式。衝突小，容易解決。
+- **F-017 和 F-020-A**：F-020-A 的 per-provider rate limiter 已包含在 F-017 的設計中。
+
+### 建議 merge 順序
+1. F-020（獨立小項，風險最低）
+2. F-017（LLM client 快取）
+3. F-018（interface 化，影響最廣）
+4. F-019（品質檢測，最後加入分類流程）
+
+## 拓撲排序
+
+### Wave 0（全部可並行）
+- **F-017: LLM Client 連線池** -- 純 service 層重構
+- **F-018: Service Interface 化** -- 純 service 層重構
+- **F-019: 品質檢測** -- 新增 quality.go + migration
+- **F-020: 小項修復** -- 多個獨立修改
+- **QA: 撰寫 E2E test script** -- 根據 scenarios 撰寫
+
+### 無 Wave 1
+所有 feature 無互相依賴，全部在 Wave 0 並行開發。
+
+## 並行策略
+
+```
+時間線 ->
+
+Wave 0:  [F-017 LLM Client 連線池 ──────]
+         [F-018 Service Interface 化 ──────────────]
+         [F-019 品質檢測 ──────────────]
+         [F-020 小項修復 ──────────]
+         [QA 撰寫 test script ────────────────────]
+
+Code Review:         [逐 PR 審查 ─────────────────]
+
+Merge 順序:    F-020 → F-017 → F-018 → F-019
+```
+
+## 關鍵路徑
+
+無嚴格的關鍵路徑。F-018 因影響檔案最多，預計開發時間最長。
+
+## 風險項目
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| F-018 影響所有 service | 合併衝突多 | 建議最早開始開發、最晚 merge |
+| F-017 和 F-018 修改同一 struct | 合併衝突 | F-017 先 merge，F-018 rebase |
+| F-019 migration 序號衝突 | migration 執行順序錯 | 統一分配序號：009=quality_flags, 010=oauth_states |
+| 多個 PR 同時修改 classifier.go | 合併衝突 | F-018 和 F-019 協調 merge 順序 |

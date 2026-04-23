@@ -54,6 +54,10 @@
 | F-014 | Tags 分層 + 多維度搜尋 | Sprint 5 | P0 | `specs/features/f014-tags-hierarchy.md` |
 | F-015 | 知識生命週期 | Sprint 5 | P0 | `specs/features/f015-knowledge-lifecycle.md` |
 | F-016 | 中文分詞優化 | Sprint 5 | P0 | `specs/features/f016-chinese-tokenizer.md` |
+| F-017 | LLM Client 連線池 | Sprint 6 | P0 | `specs/features/f017-llm-connection-pool.md` |
+| F-018 | Service Interface 化 | Sprint 6 | P0 | `specs/features/f018-service-interfaces.md` |
+| F-019 | 品質檢測（VIBE 簡化版） | Sprint 6 | P1 | `specs/features/f019-quality-check.md` |
+| F-020 | 小項修復 | Sprint 6 | P1 | `specs/features/f020-misc-fixes.md` |
 
 ## Sprint 規劃
 
@@ -81,6 +85,12 @@
 - F-014 Tags 分層 + 多維度搜尋
 - F-015 知識生命週期
 - F-016 中文分詞優化
+
+### Sprint 6：工程品質
+- F-017 LLM Client 連線池
+- F-018 Service Interface 化
+- F-019 品質檢測（VIBE 簡化版）
+- F-020 小項修復
 
 ## 非功能需求
 

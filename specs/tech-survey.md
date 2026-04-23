@@ -1152,3 +1152,101 @@ Sprint 5 不新增 Go 程式碼依賴，只新增 PostgreSQL 擴展。Docker ima
 | domains + context 欄位增加 LLM prompt 複雜度 | 分類品質下降 | 分離 prompt：先分類 category/tags，再提取 domains/context |
 | supersede 循環引用檢測效能 | 長鏈造成遞迴查詢慢 | 限制鏈長最多 10 層，WITH RECURSIVE + LIMIT |
 | 現有 entries 的 domains/context 為空 | 搜尋按 domain 過濾找不到舊資料 | 提供批次 re-classify API 更新舊 entries 的 domains/context |
+
+---
+
+# Sprint 6 技術選型補充調查
+
+## 調查日期
+2026-04-22
+
+## 32. LLM Client 連線池策略
+
+### 候選方案
+
+| 方案 | 優點 | 缺點 | 適用場景 |
+|------|------|------|---------|
+| A: 每次建立新 client | 簡單、無狀態 | 連線浪費、延遲高 | 低頻呼叫 |
+| B: sync.Map 快取 | 原生 concurrent map、無需手動鎖 | 無法控制 eviction、型別不安全 | 簡單快取 |
+| C: sync.RWMutex + map | 完全控制、可做 invalidation | 需手動管理鎖 | 需要 invalidation 的快取 |
+| D: groupcache / ristretto | 功能豐富、TTL/LRU | 額外依賴、過度設計 | 大規模快取 |
+
+### 決策
+選擇 **方案 C：sync.RWMutex + map[uuid.UUID]*cachedClient**
+
+### 理由
+1. **Provider 數量少**（通常 1-5 個），不需要 LRU 或 TTL 機制
+2. **需要主動 invalidation**：provider 設定更新時必須清除快取，sync.Map 不便操作
+3. **不引入額外依賴**：Go 標準庫 sync.RWMutex 足夠
+4. **configHash 偵測變更**：用 sha256(endpointURL + apiKey) 做快取 key 的一部分，自動偵測設定變更
+
+### go-openai Client 連線復用分析
+go-openai 內部使用 `net/http.Client`，而 Go 的 `http.DefaultTransport` 預設啟用 HTTP/1.1 keep-alive 連線池（MaxIdleConns=100, MaxIdleConnsPerHost=2）。因此重用 `openai.Client` 即可自動重用底層 TCP 連線。
+
+---
+
+## 33. Go Service Interface 設計慣例
+
+### Go Interface 最佳實踐
+
+| 原則 | 說明 | 本專案應用 |
+|------|------|-----------|
+| Consumer defines interface | Interface 定義在使用方（service），不是提供方（repository） | interface 放在 service package |
+| Keep interfaces small | 每個 interface 只包含 consumer 需要的方法 | 不做一個大的 Repository interface |
+| Accept interfaces, return structs | 構造函式接收 interface，回傳 concrete struct | NewClassifierService(repo EntryRepository) |
+| Implicit satisfaction | Go 不需要 `implements` 關鍵字 | repository struct 不需修改 |
+
+### Mock 策略
+
+| 方案 | 優點 | 缺點 |
+|------|------|------|
+| 手動 struct mock | 簡單直觀、不引入工具 | 方法多時 boilerplate 多 |
+| gomock/mockgen | 自動生成 mock | 額外依賴、generated code |
+| testify/mock | assertion 整合好 | 需要學習 mock API |
+
+### 決策
+Sprint 6 使用**手動 struct mock**。理由：
+1. Repository interface 方法數量適中（5-10 個），手動 mock 可接受
+2. 不引入 mockgen 等工具鏈
+3. 未來如方法增多，再考慮引入 mockgen
+
+---
+
+## 34. PII 偵測方案
+
+### 候選方案
+
+| 方案 | 優點 | 缺點 | 延遲影響 |
+|------|------|------|---------|
+| A: Regex pattern matching | 快速、無外部依賴、確定性 | 只能偵測已知 pattern | < 1ms |
+| B: LLM 語意偵測 | 能偵測語意層級的敏感資訊 | 額外 LLM 呼叫、延遲高 | 1-5 秒 |
+| C: 專用 NER model (spaCy/presidio) | 精確度高 | 需額外服務、Go 整合困難 | 100-500ms |
+| D: Regex + LLM 二層 | 兼顧速度和深度 | 實作複雜 | 視層級 |
+
+### 決策
+Sprint 6 選擇 **方案 A：Regex pattern matching**
+
+### 理由
+1. **零延遲影響**：regex 檢測 < 1ms，不影響分類流程
+2. **確定性**：pattern 命中即報告，無 false positive 的模型偏差
+3. **不增加 LLM 成本**：不需要額外的 LLM API 呼叫
+4. **可擴展**：未來可在 regex 層之上疊加 LLM 語意偵測（方案 D）
+5. **個人知識庫場景**：最常見的 PII 洩漏是不小心貼入包含 email/API key 的內容，regex 足夠偵測
+
+---
+
+## 35. Sprint 6 不新增依賴
+
+Sprint 6 所有改動使用現有依賴即可，不新增任何 Go module dependency。
+
+---
+
+## 36. Sprint 6 技術風險與緩解
+
+| 風險 | 影響 | 緩解措施 |
+|------|------|---------|
+| F-018 interface 化影響範圍大 | 編譯錯誤多、影響所有 service | 逐個 service 修改，每改完一個確認編譯通過 |
+| Client 快取 race condition | goroutine 安全問題 | sync.RWMutex 保護、unit test 驗證並發場景 |
+| PII regex false positive | 正常內容被誤標 | 只標記不阻擋，使用者可忽略 warning |
+| OAuth state DB migration | GCal OAuth 短暫中斷 | migration 是 ADD TABLE，不影響現有表 |
+| repo_path 白名單限制太嚴 | 使用者無法匯入 repo | 未設定 ALLOWED_REPO_PATHS 時保持開放（向下相容） |
