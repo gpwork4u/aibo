@@ -12,7 +12,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gpwork4u/aibo/model"
-	"github.com/gpwork4u/aibo/repository"
 )
 
 const (
@@ -23,11 +22,11 @@ const (
 
 // ApiKeyService API Key 業務邏輯
 type ApiKeyService struct {
-	repo *repository.ApiKeyRepository
+	repo ApiKeyRepository
 }
 
 // NewApiKeyService 建立新的 ApiKeyService
-func NewApiKeyService(repo *repository.ApiKeyRepository) *ApiKeyService {
+func NewApiKeyService(repo ApiKeyRepository) *ApiKeyService {
 	return &ApiKeyService{repo: repo}
 }
 

@@ -14,11 +14,11 @@ import (
 // SearchService 搜尋業務邏輯
 type SearchService struct {
 	llmSvc     *LlmService
-	searchRepo *repository.SearchRepository
+	searchRepo SearchRepository
 }
 
 // NewSearchService 建立新的 SearchService
-func NewSearchService(llmSvc *LlmService, searchRepo *repository.SearchRepository) *SearchService {
+func NewSearchService(llmSvc *LlmService, searchRepo SearchRepository) *SearchService {
 	return &SearchService{
 		llmSvc:     llmSvc,
 		searchRepo: searchRepo,

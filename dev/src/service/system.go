@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-
-	"github.com/gpwork4u/aibo/repository"
 )
 
 // SearchConfigResult 搜尋配置結果
@@ -15,11 +13,11 @@ type SearchConfigResult struct {
 
 // SystemService 系統資訊業務邏輯
 type SystemService struct {
-	repo *repository.SystemRepository
+	repo SystemRepository
 }
 
 // NewSystemService 建立新的 SystemService
-func NewSystemService(repo *repository.SystemRepository) *SystemService {
+func NewSystemService(repo SystemRepository) *SystemService {
 	return &SystemService{repo: repo}
 }
 
