@@ -92,6 +92,7 @@ func (h *SearchHandler) SmartSearch(c *gin.Context) {
 		items = append(items, dto.SearchResultItem{
 			EntryID:         r.EntryID,
 			Title:           r.Title,
+			Summary:         r.Summary,
 			ContentPreview:  r.ContentPreview,
 			Tags:            tags,
 			Relevance:       r.Relevance,
@@ -191,6 +192,7 @@ func (h *SearchHandler) SimpleSearch(c *gin.Context) {
 		items = append(items, dto.SimpleSearchResultItem{
 			EntryID:        r.EntryID,
 			Title:          r.Title,
+			Summary:        r.Summary,
 			ContentPreview: r.ContentPreview,
 			Tags:           tags,
 			Relevance:      r.Relevance,
