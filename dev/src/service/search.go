@@ -43,6 +43,7 @@ type SmartSearchOutput struct {
 type SearchResultOutput struct {
 	EntryID         uuid.UUID
 	Title           *string
+	Summary         *string
 	ContentPreview  string
 	Tags            []string
 	Relevance       float64
@@ -69,6 +70,7 @@ type SimpleSearchOutput struct {
 type SimpleSearchResultOutput struct {
 	EntryID        uuid.UUID
 	Title          *string
+	Summary        *string
 	ContentPreview string
 	Tags           []string
 	Relevance      float64
@@ -149,6 +151,7 @@ func (s *SearchService) SmartSearch(ctx context.Context, input SmartSearchInput)
 		item := SearchResultOutput{
 			EntryID:        r.EntryID,
 			Title:          r.Title,
+			Summary:        r.Summary,
 			ContentPreview: preview,
 			Tags:           tags,
 			Relevance:      r.Relevance,
@@ -208,6 +211,7 @@ func (s *SearchService) SimpleSearch(ctx context.Context, input SimpleSearchInpu
 		output.Results = append(output.Results, SimpleSearchResultOutput{
 			EntryID:        r.EntryID,
 			Title:          r.Title,
+			Summary:        r.Summary,
 			ContentPreview: preview,
 			Tags:           tags,
 			Relevance:      r.Relevance,

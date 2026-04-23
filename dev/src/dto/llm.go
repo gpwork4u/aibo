@@ -7,6 +7,9 @@ type ClassifyResult struct {
 	Category string   `json:"category"`
 	Tags     []string `json:"tags"`
 	Title    string   `json:"title"`
+	Summary  string   `json:"summary"` // 一句話摘要
+	Detail   string   `json:"detail"`  // 詳細說明
+	Action   string   `json:"action"`  // 可執行的建議/行動
 }
 
 // ClassifyResponse 手動觸發分類的回應

@@ -11,6 +11,9 @@ type Entry struct {
 	ID         uuid.UUID  `json:"id"`
 	Title      *string    `json:"title"`
 	Content    *string    `json:"content"`
+	Summary    *string    `json:"summary"`
+	Detail     *string    `json:"detail"`
+	Action     *string    `json:"action"`
 	CategoryID *uuid.UUID `json:"category_id"`
 	Source     *string    `json:"source"`
 	SourceType *string    `json:"source_type"`
@@ -25,6 +28,7 @@ type Entry struct {
 type EntryListItem struct {
 	ID             uuid.UUID  `json:"id"`
 	Title          *string    `json:"title"`
+	Summary        *string    `json:"summary"`
 	ContentPreview *string    `json:"content_preview"`
 	CategoryID     *uuid.UUID `json:"category_id"`
 	Tags           []string   `json:"tags"`

@@ -10,6 +10,9 @@ import (
 type CreateEntryRequest struct {
 	Title      *string    `json:"title"`
 	Content    *string    `json:"content"`
+	Summary    *string    `json:"summary"`
+	Detail     *string    `json:"detail"`
+	Action     *string    `json:"action"`
 	CategoryID *uuid.UUID `json:"category_id"`
 	Source     *string    `json:"source"`
 	SourceType *string    `json:"source_type"`
@@ -22,6 +25,9 @@ type CreateEntryRequest struct {
 type UpdateEntryRequest struct {
 	Title      *string    `json:"title"`
 	Content    *string    `json:"content"`
+	Summary    *string    `json:"summary"`
+	Detail     *string    `json:"detail"`
+	Action     *string    `json:"action"`
 	CategoryID *uuid.UUID `json:"category_id"`
 	Source     *string    `json:"source"`
 	SourceType *string    `json:"source_type"`
@@ -35,11 +41,14 @@ type UpdateEntryRequest struct {
 	HasCategoryID bool `json:"-"`
 }
 
-// EntryResponse 單筆知識條目回應（完整 content）
+// EntryResponse 單筆知識條目回應（完整 content + summary/detail/action）
 type EntryResponse struct {
 	ID         uuid.UUID  `json:"id"`
 	Title      *string    `json:"title"`
 	Content    *string    `json:"content"`
+	Summary    *string    `json:"summary"`
+	Detail     *string    `json:"detail"`
+	Action     *string    `json:"action"`
 	CategoryID *uuid.UUID `json:"category_id"`
 	Source     *string    `json:"source"`
 	SourceType *string    `json:"source_type"`
@@ -50,10 +59,11 @@ type EntryResponse struct {
 	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
-// EntryListItemResponse 列表中的知識條目（content_preview，不含 source 欄位）
+// EntryListItemResponse 列表中的知識條目（含 summary，不含 detail/action/source）
 type EntryListItemResponse struct {
 	ID             uuid.UUID  `json:"id"`
 	Title          *string    `json:"title"`
+	Summary        *string    `json:"summary"`
 	ContentPreview *string    `json:"content_preview"`
 	CategoryID     *uuid.UUID `json:"category_id"`
 	Tags           []string   `json:"tags"`

@@ -36,12 +36,22 @@ func NewLlmService(providerSvc *LlmProviderService, aesCrypto *crypto.AESCrypto)
 const classifySystemPrompt = `你是一個知識分類助手。根據使用者提供的內容，分析其主題並回傳 JSON 格式的分類結果。
 
 回傳格式必須嚴格為：
-{"category": "分類名稱", "tags": ["tag1", "tag2"], "title": "建議標題"}
+{
+  "category": "分類名稱",
+  "tags": ["tag1", "tag2"],
+  "title": "建議標題",
+  "summary": "一句話摘要（30字以內）",
+  "detail": "詳細說明（保留原始內容的關鍵資訊，100-300字）",
+  "action": "可執行的建議或行動（如：使用 X 來解決 Y；在 Z 場景下採用此方案）"
+}
 
 規則：
 1. category：選擇最適合的分類名稱，簡潔明確
 2. tags：提取 2-5 個關鍵字作為標籤，使用小寫英文或中文
 3. title：根據內容產生一個簡潔的標題（不超過 50 字）
+4. summary：用一句話概括這則知識的核心觀點
+5. detail：萃取內容中的關鍵資訊、步驟或論點
+6. action：如果內容包含可操作的建議，提取為行動指引；如果是純知識性內容，寫「供參考」
 
 只回傳 JSON，不要包含任何其他文字、說明或 markdown 格式。`
 

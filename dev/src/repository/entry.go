@@ -25,10 +25,10 @@ func NewEntryRepository(pool *pgxpool.Pool) *EntryRepository {
 // Create 建立新知識條目
 func (r *EntryRepository) Create(ctx context.Context, entry *model.Entry) error {
 	_, err := r.pool.Exec(ctx,
-		`INSERT INTO entries (id, title, content, category_id, source, source_type, source_ref, tags, is_archived, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-		entry.ID, entry.Title, entry.Content, entry.CategoryID,
-		entry.Source, entry.SourceType, entry.SourceRef,
+		`INSERT INTO entries (id, title, content, summary, detail, action, category_id, source, source_type, source_ref, tags, is_archived, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+		entry.ID, entry.Title, entry.Content, entry.Summary, entry.Detail, entry.Action,
+		entry.CategoryID, entry.Source, entry.SourceType, entry.SourceRef,
 		entry.Tags, entry.IsArchived, entry.CreatedAt, entry.UpdatedAt,
 	)
 	if err != nil {
@@ -47,12 +47,12 @@ func (r *EntryRepository) Create(ctx context.Context, entry *model.Entry) error 
 func (r *EntryRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.Entry, error) {
 	entry := &model.Entry{}
 	err := r.pool.QueryRow(ctx,
-		`SELECT id, title, content, category_id, source, source_type, source_ref, tags, is_archived, created_at, updated_at
+		`SELECT id, title, content, summary, detail, action, category_id, source, source_type, source_ref, tags, is_archived, created_at, updated_at
 		 FROM entries WHERE id = $1`,
 		id,
 	).Scan(
-		&entry.ID, &entry.Title, &entry.Content, &entry.CategoryID,
-		&entry.Source, &entry.SourceType, &entry.SourceRef,
+		&entry.ID, &entry.Title, &entry.Content, &entry.Summary, &entry.Detail, &entry.Action,
+		&entry.CategoryID, &entry.Source, &entry.SourceType, &entry.SourceRef,
 		&entry.Tags, &entry.IsArchived, &entry.CreatedAt, &entry.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -108,11 +108,12 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 		searchArgIdx = argIdx
 		// 加權 tsvector 全文搜尋 + pg_trgm 模糊搜尋 + tag ILIKE
 		searchCondition := fmt.Sprintf(
-			`((setweight(to_tsvector('simple', coalesce(e.title, '')), 'A') ||
+			`((setweight(to_tsvector('simple', coalesce(e.summary, '')), 'A') ||
+			   setweight(to_tsvector('simple', coalesce(e.title, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(array_to_string(e.tags, ' '), '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'))
 			  @@ plainto_tsquery('simple', $%d)
-			 OR (coalesce(e.title,'') || ' ' || coalesce(e.content,'')) %% $%d
+			 OR (coalesce(e.summary,'') || ' ' || coalesce(e.title,'') || ' ' || coalesce(e.content,'')) %% $%d
 			 OR EXISTS (SELECT 1 FROM unnest(e.tags) AS t WHERE t ILIKE '%%' || $%d || '%%'))`,
 			argIdx, argIdx, argIdx,
 		)
@@ -132,6 +133,7 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 	if hasSearch {
 		orderClause = fmt.Sprintf(
 			`ts_rank(
+			   setweight(to_tsvector('simple', coalesce(e.summary, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.title, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(array_to_string(e.tags, ' '), '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'),
@@ -171,7 +173,7 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 
 	// 查詢資料（content_preview 用 LEFT(content, 200)，列表不含 source/source_type/source_ref）
 	dataQuery := fmt.Sprintf(
-		`SELECT e.id, e.title, LEFT(e.content, 200) AS content_preview, e.category_id,
+		`SELECT e.id, e.title, e.summary, LEFT(e.content, 200) AS content_preview, e.category_id,
 		        e.tags, e.is_archived, e.created_at, e.updated_at
 		 FROM entries e
 		 %s
@@ -191,7 +193,7 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 	for rows.Next() {
 		var item model.EntryListItem
 		if err := rows.Scan(
-			&item.ID, &item.Title, &item.ContentPreview, &item.CategoryID,
+			&item.ID, &item.Title, &item.Summary, &item.ContentPreview, &item.CategoryID,
 			&item.Tags, &item.IsArchived, &item.CreatedAt, &item.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -217,11 +219,12 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 func (r *EntryRepository) Update(ctx context.Context, entry *model.Entry) error {
 	tag, err := r.pool.Exec(ctx,
 		`UPDATE entries
-		 SET title = $1, content = $2, category_id = $3, source = $4, source_type = $5,
-		     source_ref = $6, tags = $7, is_archived = $8, updated_at = NOW()
-		 WHERE id = $9`,
-		entry.Title, entry.Content, entry.CategoryID,
-		entry.Source, entry.SourceType, entry.SourceRef,
+		 SET title = $1, content = $2, summary = $3, detail = $4, action = $5,
+		     category_id = $6, source = $7, source_type = $8,
+		     source_ref = $9, tags = $10, is_archived = $11, updated_at = NOW()
+		 WHERE id = $12`,
+		entry.Title, entry.Content, entry.Summary, entry.Detail, entry.Action,
+		entry.CategoryID, entry.Source, entry.SourceType, entry.SourceRef,
 		entry.Tags, entry.IsArchived, entry.ID,
 	)
 	if err != nil {

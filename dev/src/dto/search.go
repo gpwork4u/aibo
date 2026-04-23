@@ -13,6 +13,7 @@ type SmartSearchRequest struct {
 type SearchResultItem struct {
 	EntryID         uuid.UUID `json:"entry_id"`
 	Title           *string   `json:"title"`
+	Summary         *string   `json:"summary"`
 	ContentPreview  string    `json:"content_preview"`
 	Tags            []string  `json:"tags"`
 	Relevance       float64   `json:"relevance"`
@@ -31,6 +32,7 @@ type SmartSearchResponse struct {
 type SimpleSearchResultItem struct {
 	EntryID        uuid.UUID `json:"entry_id"`
 	Title          *string   `json:"title"`
+	Summary        *string   `json:"summary"`
 	ContentPreview string    `json:"content_preview"`
 	Tags           []string  `json:"tags"`
 	Relevance      float64   `json:"relevance"`

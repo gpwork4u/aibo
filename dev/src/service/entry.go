@@ -215,6 +215,33 @@ func (s *EntryService) Update(ctx context.Context, id uuid.UUID, updates map[str
 		}
 	}
 
+	if v, ok := updates["summary"]; ok {
+		if v == nil {
+			existing.Summary = nil
+		} else {
+			s := v.(string)
+			existing.Summary = &s
+		}
+	}
+
+	if v, ok := updates["detail"]; ok {
+		if v == nil {
+			existing.Detail = nil
+		} else {
+			s := v.(string)
+			existing.Detail = &s
+		}
+	}
+
+	if v, ok := updates["action"]; ok {
+		if v == nil {
+			existing.Action = nil
+		} else {
+			s := v.(string)
+			existing.Action = &s
+		}
+	}
+
 	if v, ok := updates["tags"]; ok {
 		if v == nil {
 			existing.Tags = []string{}

@@ -21,6 +21,7 @@ func escapeLikePattern(s string) string {
 type SearchResult struct {
 	EntryID        uuid.UUID
 	Title          *string
+	Summary        *string
 	ContentPreview *string
 	Tags           []string
 	Relevance      float64
@@ -66,11 +67,12 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 		escapedKwIdx := argIdx + 1
 		keywordArgIndices = append(keywordArgIndices, kwIdx)
 		searchConditions = append(searchConditions, fmt.Sprintf(
-			`((setweight(to_tsvector('simple', coalesce(e.title, '')), 'A') ||
+			`((setweight(to_tsvector('simple', coalesce(e.summary, '')), 'A') ||
+			   setweight(to_tsvector('simple', coalesce(e.title, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(array_to_string(e.tags, ' '), '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'))
 			  @@ plainto_tsquery('simple', $%d)
-			 OR (coalesce(e.title,'') || ' ' || coalesce(e.content,'')) %% $%d
+			 OR (coalesce(e.summary,'') || ' ' || coalesce(e.title,'') || ' ' || coalesce(e.content,'')) %% $%d
 			 OR EXISTS (SELECT 1 FROM unnest(e.tags) AS t WHERE t ILIKE '%%' || $%d || '%%' ESCAPE '\\'))`,
 			kwIdx, kwIdx, escapedKwIdx,
 		))
@@ -100,6 +102,7 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 	for _, kwIdx := range keywordArgIndices {
 		rankExprs = append(rankExprs, fmt.Sprintf(
 			`ts_rank(
+			   setweight(to_tsvector('simple', coalesce(e.summary, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.title, '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(array_to_string(e.tags, ' '), '')), 'A') ||
 			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'),
@@ -123,7 +126,7 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 
 	// 查詢資料
 	dataQuery := fmt.Sprintf(
-		`SELECT e.id, e.title, LEFT(e.content, 200) AS content_preview,
+		`SELECT e.id, e.title, e.summary, LEFT(e.content, 200) AS content_preview,
 		        e.tags, %s AS relevance
 		 FROM entries e
 		 %s
@@ -143,7 +146,7 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 	for rows.Next() {
 		var item SearchResult
 		if err := rows.Scan(
-			&item.EntryID, &item.Title, &item.ContentPreview,
+			&item.EntryID, &item.Title, &item.Summary, &item.ContentPreview,
 			&item.Tags, &item.Relevance,
 		); err != nil {
 			return nil, 0, err

@@ -98,6 +98,17 @@ func (s *ClassifierService) ClassifyEntry(ctx context.Context, entryID uuid.UUID
 		entry.Title = &result.Title
 	}
 
+	// summary/detail/action：LLM 產生時覆蓋（向下相容：空字串不覆蓋）
+	if result.Summary != "" {
+		entry.Summary = &result.Summary
+	}
+	if result.Detail != "" {
+		entry.Detail = &result.Detail
+	}
+	if result.Action != "" {
+		entry.Action = &result.Action
+	}
+
 	if err := s.entryRepo.Update(ctx, entry); err != nil {
 		return fmt.Errorf("更新 entry 失敗: %w", err)
 	}

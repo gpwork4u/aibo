@@ -131,6 +131,7 @@ func (h *EntryHandler) List(c *gin.Context) {
 		items = append(items, dto.EntryListItemResponse{
 			ID:             item.ID,
 			Title:          item.Title,
+			Summary:        item.Summary,
 			ContentPreview: item.ContentPreview,
 			CategoryID:     item.CategoryID,
 			Tags:           tags,
@@ -297,6 +298,39 @@ func (h *EntryHandler) Update(c *gin.Context) {
 		}
 	}
 
+	if v, ok := rawMap["summary"]; ok {
+		if string(v) == "null" {
+			updates["summary"] = nil
+		} else {
+			var s string
+			if err := json.Unmarshal(v, &s); err == nil {
+				updates["summary"] = s
+			}
+		}
+	}
+
+	if v, ok := rawMap["detail"]; ok {
+		if string(v) == "null" {
+			updates["detail"] = nil
+		} else {
+			var s string
+			if err := json.Unmarshal(v, &s); err == nil {
+				updates["detail"] = s
+			}
+		}
+	}
+
+	if v, ok := rawMap["action"]; ok {
+		if string(v) == "null" {
+			updates["action"] = nil
+		} else {
+			var s string
+			if err := json.Unmarshal(v, &s); err == nil {
+				updates["action"] = s
+			}
+		}
+	}
+
 	if v, ok := rawMap["tags"]; ok {
 		if string(v) == "null" {
 			updates["tags"] = nil
@@ -360,6 +394,9 @@ func toEntryResponse(entry *model.Entry) dto.EntryResponse {
 		ID:         entry.ID,
 		Title:      entry.Title,
 		Content:    entry.Content,
+		Summary:    entry.Summary,
+		Detail:     entry.Detail,
+		Action:     entry.Action,
 		CategoryID: entry.CategoryID,
 		Source:     entry.Source,
 		SourceType: entry.SourceType,
