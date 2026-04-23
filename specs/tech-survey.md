@@ -1250,3 +1250,211 @@ Sprint 6 所有改動使用現有依賴即可，不新增任何 Go module depend
 | PII regex false positive | 正常內容被誤標 | 只標記不阻擋，使用者可忽略 warning |
 | OAuth state DB migration | GCal OAuth 短暫中斷 | migration 是 ADD TABLE，不影響現有表 |
 | repo_path 白名單限制太嚴 | 使用者無法匯入 repo | 未設定 ALLOWED_REPO_PATHS 時保持開放（向下相容） |
+
+# Sprint 7 技術選型補充調查
+
+## 調查日期
+2026-04-23
+
+## 37. 前端資料獲取：TanStack Query vs SWR
+
+### 候選方案
+
+| 方案 | Weekly DL | Bundle (gzip) | 優點 | 缺點 |
+|------|-----------|---------------|------|------|
+| TanStack Query v5 | 12.3M | 13.4KB | useMutation 完整、DevTools、細緻快取控制（staleTime/gcTime/refetchInterval）、optimistic updates 內建 | bundle 較大、App Router 需 HydrationBoundary |
+| SWR v2 | 7.7M | 4.2KB | 輕量、與 Next.js 同 Vercel 生態整合緊密 | useSWRMutation 功能簡單、無 DevTools |
+
+### 決策
+選擇 **TanStack Query v5**（`@tanstack/react-query`）
+
+### 理由
+1. **管理介面多 mutation 場景**：API Keys / Entries / Categories / LLM Providers 都需要 CRUD，useMutation 的 optimistic updates、rollback、cache invalidation 直接解決樂觀 UI 需求
+2. **DevTools 提升開發效率**：aibo 有 40+ API endpoints，DevTools 大幅簡化除錯
+3. **細緻快取**：Inbox 需要即時更新（短 staleTime），Categories 變動少（長 staleTime），TanStack Query 可分 query key 配置
+4. **bundle 差距可接受**：管理介面非公開 SPA，13KB 不是瓶頸
+5. **社群成長**：2024 後已超越 SWR，生態更活躍
+
+### 使用方式
+
+```tsx
+// QueryClient Provider
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
+
+// Query
+const { data, isLoading } = useQuery({
+  queryKey: ["entries", { categoryId, sort }],
+  queryFn: () => api.entries.list({ categoryId, sort }),
+})
+
+// Mutation with optimistic update
+const mutation = useMutation({
+  mutationFn: (id: string) => api.entries.delete(id),
+  onSuccess: () => queryClient.invalidateQueries({ queryKey: ["entries"] }),
+})
+```
+
+### 參考資料
+- [TanStack Query vs SWR vs Apollo 2026](https://www.pkgpulse.com/blog/tanstack-query-vs-swr-vs-apollo-2026)
+- [SWR vs TanStack Query 2026](https://dev.to/jake_kim_bd3065a6816799db/swr-vs-tanstack-query-2026-which-react-data-fetching-library-should-you-choose-342c)
+
+---
+
+## 38. 表單：React Hook Form + Zod
+
+### 決策
+選擇 **react-hook-form v7 + zod v3**，搭配 shadcn/ui `<Form>` 元件
+
+### 理由
+1. **shadcn/ui 官方推薦組合**：`<Form>` 元件本身就是 react-hook-form 的 FormProvider 包裝，無縫整合
+2. **Zod schema 一次定義**：validation + TypeScript 型別共用，與後端 API DTO 對應清楚
+3. **效能**：uncontrolled components 不會每次 keystroke re-render，適合 Entry 編輯等長表單
+4. **CMS 慣例**：2026 年 Next.js 管理介面的事實標準組合
+
+### 表單 Pattern
+
+```tsx
+const formSchema = z.object({
+  name: z.string().min(1, "名稱為必填").max(50),
+  description: z.string().max(200).optional(),
+})
+
+const form = useForm<z.infer<typeof formSchema>>({
+  resolver: zodResolver(formSchema),
+  defaultValues: { name: "", description: "" },
+})
+
+<Form {...form}>
+  <form onSubmit={form.handleSubmit(onSubmit)}>
+    <FormField control={form.control} name="name" render={({ field }) => (
+      <FormItem>
+        <FormLabel>名稱 *</FormLabel>
+        <FormControl><Input {...field} /></FormControl>
+        <FormMessage />
+      </FormItem>
+    )} />
+  </form>
+</Form>
+```
+
+### 參考資料
+- [React Hook Form - shadcn/ui](https://ui.shadcn.com/docs/forms/react-hook-form)
+- [Master Form Handling with RHF + Zod + Shadcn UI](https://shadcnstudio.com/blog/react-hook-form-zod-shadcn-ui)
+
+---
+
+## 39. Markdown Renderer
+
+### 候選方案
+
+| 方案 | Stars | 優點 | 缺點 |
+|------|-------|------|------|
+| react-markdown | 13k+ | AST-based、安全（不使用 dangerouslySetInnerHTML）、remark/rehype plugin 生態 | 需自行配置 plugin |
+| marked + DOMPurify | 34k+ | 超快 | 需手動 sanitize、plugin 生態較弱 |
+| MDX | N/A | 支援 JSX | 過度複雜，runtime MDX 有風險 |
+
+### 決策
+選擇 **react-markdown** + **remark-gfm** + **rehype-highlight**
+
+### 理由
+1. **aibo entry content 是純 markdown**，不需要 JSX 混寫（MDX 太重）
+2. **remark-gfm**：支援 GitHub Flavored Markdown（表格、任務清單、自動連結）
+3. **rehype-highlight**：syntax highlighting（技術筆記常有 code block）
+4. **安全**：react-markdown 預設不允許 raw HTML，避免 XSS
+5. **Typography 整合**：搭配 `@tailwindcss/typography` 的 `prose` class 直接美化
+
+### 參考資料
+- [react-markdown GitHub](https://github.com/remarkjs/react-markdown)
+- [remark-gfm](https://github.com/remarkjs/remark-gfm)
+
+---
+
+## 40. 前端專案結構（Next.js App Router）
+
+### 決策
+前端 code 放在 `dev/frontend/`（與後端 `dev/src/` 同層，分離目錄）
+
+### 目錄結構
+
+```
+dev/frontend/
+├── app/
+│   ├── layout.tsx              # Root layout + QueryClientProvider + Toaster
+│   ├── page.tsx                # redirect /inbox
+│   ├── (dashboard)/
+│   │   ├── layout.tsx          # Sidebar + Header layout
+│   │   ├── inbox/page.tsx
+│   │   ├── entries/
+│   │   │   ├── page.tsx
+│   │   │   └── [id]/page.tsx
+│   │   ├── categories/page.tsx
+│   │   ├── search/page.tsx
+│   │   └── settings/
+│   │       ├── api-keys/page.tsx
+│   │       └── llm-providers/page.tsx
+│   └── bootstrap/page.tsx      # 首次設定（無 API key 時）
+├── components/
+│   ├── ui/                     # shadcn/ui 元件
+│   ├── app-sidebar.tsx
+│   ├── page-header.tsx
+│   ├── data-table.tsx
+│   ├── tag-input.tsx
+│   ├── markdown-viewer.tsx
+│   └── forms/                  # 各種表單元件
+├── lib/
+│   ├── api/                    # API client（fetch 包裝）
+│   │   ├── client.ts           # 注入 X-API-Key header
+│   │   ├── entries.ts
+│   │   ├── categories.ts
+│   │   ├── api-keys.ts
+│   │   ├── llm-providers.ts
+│   │   └── search.ts
+│   ├── hooks/                  # TanStack Query hooks
+│   ├── schemas/                # Zod schemas
+│   └── utils.ts
+├── public/
+├── next.config.ts
+├── tailwind.config.ts
+├── tsconfig.json
+├── package.json
+└── Dockerfile
+```
+
+### API Key 儲存策略
+- 使用 `localStorage` 儲存（管理介面，同源使用）
+- 首次進入頁面偵測：無 key → redirect /bootstrap → bootstrap 流程建立
+- API client 自動注入 `X-API-Key` header
+
+---
+
+## 41. Sprint 7 新增依賴
+
+| 用途 | Package | 選擇理由 |
+|------|---------|---------|
+| Framework | next@14 | App Router + RSC |
+| UI Kit | shadcn/ui + tailwindcss@4 + radix-ui | 已決策（#6） |
+| Data Fetching | @tanstack/react-query@5 | mutation 完整、DevTools |
+| Form | react-hook-form@7 + zod@3 + @hookform/resolvers | shadcn/ui 官方組合 |
+| Markdown | react-markdown + remark-gfm + rehype-highlight | 安全 + GFM + 語法高亮 |
+| Icons | lucide-react | shadcn/ui 預設 |
+| Date | date-fns | 輕量、tree-shakable |
+| Toast | sonner | shadcn/ui 預設 |
+
+---
+
+## 42. Sprint 7 技術風險與緩解
+
+| 風險 | 影響 | 緩解措施 |
+|------|------|---------|
+| API Key 存在 localStorage 有 XSS 風險 | Key 洩漏 | 管理介面本就需要認證、CSP header + react-markdown 不啟用 raw HTML |
+| Tailwind v4 與 shadcn/ui 相容性 | 樣式錯亂 | 使用 shadcn/ui 官方 CLI 生成元件，確認 v4 相容 |
+| Next.js 14 App Router 與 TanStack Query hydration | SSR 錯誤 | 使用 HydrationBoundary、查詢以 "use client" 組件觸發 |
+| 後端 CORS 設定缺失 | 前端無法呼叫 API | Gin 加 CORS middleware，允許 localhost:3000 |
+| Docker multi-service 啟動順序 | frontend 先於 api 啟動失敗 | docker-compose depends_on + Next.js client-side fetch 重試 |

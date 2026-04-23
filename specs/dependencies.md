@@ -539,3 +539,83 @@ Merge 順序:    F-020 → F-017 → F-018 → F-019
 | F-017 和 F-018 修改同一 struct | 合併衝突 | F-017 先 merge，F-018 rebase |
 | F-019 migration 序號衝突 | migration 執行順序錯 | 統一分配序號：009=quality_flags, 010=oauth_states |
 | 多個 PR 同時修改 classifier.go | 合併衝突 | F-018 和 F-019 協調 merge 順序 |
+
+---
+
+# Sprint 7 依賴圖譜
+
+## 功能總覽
+
+| 編號 | 名稱 | 優先級 | 工作量 |
+|------|------|--------|-------|
+| F-021 | 前端基礎（Next.js + Layout + 共用元件） | P0 | 大 |
+| F-022 | API Keys 管理頁 | P0 | 中 |
+| F-023 | Entries + Inbox 頁面 | P0 | 大（核心頁面 + Markdown） |
+| F-024 | Categories + LLM Providers 管理頁 | P0 | 中 |
+| F-025 | 全文搜尋頁 | P0 | 中 |
+
+## 依賴關係
+
+```
+後端 API（Sprint 1-6 已完成）
+      │
+      ▼
+F-021 前端基礎（Next.js + shadcn/ui + TanStack Query + API client + Layout）
+      │
+      ├── F-022 API Keys 管理頁
+      ├── F-023 Entries + Inbox 頁面
+      ├── F-024 Categories + LLM Providers 管理頁
+      └── F-025 全文搜尋頁
+```
+
+## 依賴說明
+
+- **F-021 必須先行**：所有頁面共用的 layout / shadcn/ui setup / API client / TanStack Query / Toaster / 共用元件（PageHeader / DataTable / TagInput / MarkdownViewer / EmptyState）都在 F-021 建立
+- **F-022/023/024/025 互相獨立**：四個頁面無跨頁依賴，可完全並行開發
+
+## 拓撲排序
+
+### Wave 0（先行，blocking）
+- **F-021**: 前端專案初始化 + Layout + 共用元件
+
+### Wave 1（F-021 完成後並行）
+- **F-022**: API Keys 管理頁
+- **F-023**: Entries + Inbox 頁面
+- **F-024**: Categories + LLM Providers 管理頁
+- **F-025**: 全文搜尋頁
+
+### QA
+- QA 與 Wave 0 同步撰寫 Playwright e2e test script
+- Wave 1 PR merge 後執行完整 browser test
+
+## 並行策略
+
+```
+時間線 ->
+
+Wave 0:  [F-021 前端基礎 ──────────────────]
+         [QA 撰寫 Playwright test ───────────────────────]
+
+Wave 1:                      [F-022 API Keys ─────────]
+                             [F-023 Entries + Inbox ──────────]
+                             [F-024 Categories + LLM Providers]
+                             [F-025 Search ───────────]
+
+Code Review:         [逐 PR 審查 ────────────────────────────]
+```
+
+## 關鍵路徑
+
+F-021 -> max(F-022, F-023, F-024, F-025)
+
+F-023 工作量最大（列表 + 詳情 + 編輯 + Markdown），預期為 Wave 1 最後完成者。
+
+## 風險項目
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| Tailwind v4 + shadcn/ui 相容性 | 樣式錯亂 | F-021 中儘早驗證，使用官方 CLI 產生元件 |
+| 後端缺 CORS middleware | 前端無法呼叫 API | F-021 中同步新增 CORS middleware 到後端 |
+| Next.js App Router + TanStack Query hydration | SSR 錯誤 | 查詢以 "use client" component 觸發 |
+| Docker compose frontend depends on api | 啟動失敗 | 使用 depends_on + healthcheck，client-side fetch 重試 |
+| F-023 Markdown 渲染 XSS | 安全風險 | 使用 react-markdown（預設禁 raw HTML）+ 不用 dangerouslySetInnerHTML |
