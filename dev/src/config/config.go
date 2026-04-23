@@ -9,8 +9,11 @@ import (
 
 // Config 應用程式設定
 type Config struct {
-	DatabaseURL string
-	ServerPort  string
+	DatabaseURL       string
+	ServerPort        string
+	GoogleClientID    string
+	GoogleClientSecret string
+	GoogleRedirectURL string
 }
 
 // Load 從環境變數載入設定
@@ -28,8 +31,16 @@ func Load() (*Config, error) {
 		port = "8080"
 	}
 
+	googleRedirectURL := os.Getenv("GOOGLE_REDIRECT_URL")
+	if googleRedirectURL == "" {
+		googleRedirectURL = "http://localhost:8080/api/v1/integrations/gcal/callback"
+	}
+
 	return &Config{
-		DatabaseURL: dbURL,
-		ServerPort:  port,
+		DatabaseURL:       dbURL,
+		ServerPort:        port,
+		GoogleClientID:    os.Getenv("GOOGLE_CLIENT_ID"),
+		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		GoogleRedirectURL: googleRedirectURL,
 	}, nil
 }

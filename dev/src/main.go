@@ -89,13 +89,27 @@ func main() {
 	entryHandler := handler.NewEntryHandler(entrySvc, classifierWorker)
 	classifyHandler := handler.NewClassifyHandler(classifierSvc, classifierWorker, entryRepo)
 
+	// 初始化 Git 匯入服務
+	gitImportSvc := service.NewGitImportService(entryRepo)
+	gitImportHandler := handler.NewGitImportHandler(gitImportSvc)
+
+	// 初始化 Google Calendar 整合服務
+	gcalRepo := repository.NewGcalIntegrationRepository(pool)
+	gcalConfig := &service.GcalConfig{
+		ClientID:     cfg.GoogleClientID,
+		ClientSecret: cfg.GoogleClientSecret,
+		RedirectURL:  cfg.GoogleRedirectURL,
+	}
+	gcalSvc := service.NewGcalService(gcalRepo, entryRepo, aesCrypto, gcalConfig)
+	gcalHandler := handler.NewGcalHandler(gcalSvc)
+
 	// 初始化搜尋服務
 	searchRepo := repository.NewSearchRepository(pool)
 	searchSvc := service.NewSearchService(llmSvc, searchRepo)
 	searchHandler := handler.NewSearchHandler(searchSvc)
 
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{

@@ -13,6 +13,9 @@ const (
 	ErrCodeDuplicateProvider = "DUPLICATE_PROVIDER"
 	ErrCodeCategoryNotFound  = "CATEGORY_NOT_FOUND"
 	ErrCodeDuplicateSource   = "DUPLICATE_SOURCE"
+	ErrCodeGcalNotConnected  = "GCAL_NOT_CONNECTED"
+	ErrCodeGcalTokenExpired  = "GCAL_TOKEN_EXPIRED"
+	ErrCodeCalendarNotFound  = "CALENDAR_NOT_FOUND"
 )
 
 // AppError 應用程式錯誤
