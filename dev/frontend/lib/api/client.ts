@@ -62,7 +62,8 @@ export class ApiClient {
       (typeof process !== "undefined"
         ? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"
         : "http://localhost:8080");
-    this.fetchImpl = opts.fetchImpl ?? (globalThis.fetch as typeof fetch);
+    // 必須 bind 到 globalThis，否則瀏覽器 fetch 失去 this context，拋出 "Illegal invocation"
+    this.fetchImpl = opts.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.getApiKey = opts.getApiKey ?? defaultGetApiKey;
     this.onUnauthorized = opts.onUnauthorized ?? defaultOnUnauthorized;
   }
