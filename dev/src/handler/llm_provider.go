@@ -4,7 +4,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/gpwork4u/aibo/dto"
 	"github.com/gpwork4u/aibo/model"
 	"github.com/gpwork4u/aibo/service"
@@ -184,19 +183,6 @@ func toProviderResponse(p *model.LlmProvider) dto.LlmProviderResponse {
 	}
 }
 
-// parseUUID 從路由參數解析 UUID
-func parseUUID(c *gin.Context) (uuid.UUID, error) {
-	idStr := c.Param("id")
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Code:    model.ErrCodeInvalidInput,
-			Message: "無效的 ID 格式",
-		})
-		return uuid.Nil, err
-	}
-	return id, nil
-}
 
 // handleError 統一處理錯誤回應
 func handleError(c *gin.Context, err error) {

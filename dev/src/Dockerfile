@@ -1,6 +1,9 @@
 ## Build stage
 FROM golang:1.23-alpine AS builder
 
+# 允許自動下載 go.mod 要求的較新 toolchain 版本
+ENV GOTOOLCHAIN=auto
+
 WORKDIR /app
 
 # 安裝必要套件

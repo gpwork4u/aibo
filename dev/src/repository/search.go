@@ -81,8 +81,8 @@ func (r *SearchRepository) Search(ctx context.Context, params SearchParams) ([]S
 			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'))
 			  @@ plainto_tsquery('simple', $%d)
 			 OR (coalesce(e.summary,'') || ' ' || coalesce(e.title,'') || ' ' || coalesce(e.content,''))
-			    LIKE '%%' || $%d || '%%' ESCAPE '\\'
-			 OR EXISTS (SELECT 1 FROM unnest(e.tags) AS t WHERE t ILIKE '%%' || $%d || '%%' ESCAPE '\\'))`,
+			    LIKE '%%' || $%d || '%%' ESCAPE '\'
+			 OR EXISTS (SELECT 1 FROM unnest(e.tags) AS t WHERE t ILIKE '%%' || $%d || '%%' ESCAPE '\'))`,
 			kwIdx, escapedKwIdx, escapedKwIdx,
 		))
 		args = append(args, kw, escapeLikePattern(kw))

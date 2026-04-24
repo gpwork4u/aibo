@@ -74,7 +74,7 @@ func TestF019_QualityCheck_EmailDetected(t *testing.T) {
 	})
 
 	// 觸發分類（品質檢測在分類流程中執行）
-	status, body, err := authedClient.Do("POST", "/api/v1/entries/"+entryID+"/classify", nil)
+	status, _, err := authedClient.Do("POST", "/api/v1/entries/"+entryID+"/classify", nil)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusAccepted, status)
 
