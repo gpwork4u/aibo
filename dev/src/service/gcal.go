@@ -158,29 +158,57 @@ func (s *GcalService) HandleCallback(ctx context.Context, code, state string) (s
 	return email, nil
 }
 
-// ImportEvents 匯入 Google Calendar 事件
-func (s *GcalService) ImportEvents(ctx context.Context, calendarID string, since, until time.Time, includeRecurring bool) (eventsFound, entriesCreated, entriesSkipped int, err error) {
+// IsConnected 判斷目前是否已完成 Google Calendar OAuth 授權。
+//
+// 回傳 (true, nil) 代表已連；(false, nil) 代表尚未連（可引導前端至設定頁）。
+// 若 DB 查詢失敗會回 error。
+func (s *GcalService) IsConnected(ctx context.Context) (bool, error) {
+	integration, err := s.gcalRepo.Get(ctx)
+	if err != nil {
+		return false, fmt.Errorf("查詢 GcalIntegration 失敗: %w", err)
+	}
+	return integration != nil, nil
+}
+
+// ListEvents 以目前已授權使用者的身份，列出指定區間的 Google Calendar 事件（read-through）。
+//
+// 行為：
+//   - 若未連 gcal，回 AppError(401, GCAL_NOT_CONNECTED)；handler 可依需求轉換狀態碼。
+//   - 若 refresh token 失敗，回 AppError(401, GCAL_TOKEN_EXPIRED)。
+//   - 其他 upstream 錯誤以 wrapped error 回傳，handler 可在允許時走 degraded。
+//   - 不會寫入 DB，也不會建立 entry（與 ImportEvents 的差異）。
+//
+// 參數：
+//   - calendarID：Google Calendar ID，通常為 "primary"
+//   - since/until：查詢區間（傳給 Google API 的 timeMin/timeMax）
+//   - singleEvents：是否展開 recurring event
+func (s *GcalService) ListEvents(
+	ctx context.Context,
+	calendarID string,
+	since, until time.Time,
+	singleEvents bool,
+) ([]*calendar.Event, error) {
 	// 取得整合資訊
 	integration, err := s.gcalRepo.Get(ctx)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("查詢 GcalIntegration 失敗: %w", err)
+		return nil, fmt.Errorf("查詢 GcalIntegration 失敗: %w", err)
 	}
 	if integration == nil {
-		return 0, 0, 0, model.NewAppError(http.StatusUnauthorized, model.ErrCodeGcalNotConnected, "Google Calendar 尚未授權")
+		return nil, model.NewAppError(http.StatusUnauthorized, model.ErrCodeGcalNotConnected, "Google Calendar 尚未授權")
 	}
 
 	// 解密 tokens
 	accessToken, err := s.aesCrypto.Decrypt(integration.AccessToken)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("解密 access_token 失敗: %w", err)
+		return nil, fmt.Errorf("解密 access_token 失敗: %w", err)
 	}
 	refreshToken, err := s.aesCrypto.Decrypt(integration.RefreshToken)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("解密 refresh_token 失敗: %w", err)
+		return nil, fmt.Errorf("解密 refresh_token 失敗: %w", err)
 	}
 	clientSecret, err := s.aesCrypto.Decrypt(integration.ClientSecret)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("解密 client_secret 失敗: %w", err)
+		return nil, fmt.Errorf("解密 client_secret 失敗: %w", err)
 	}
 
 	// 建立 OAuth2 token
@@ -204,7 +232,7 @@ func (s *GcalService) ImportEvents(ctx context.Context, calendarID string, since
 	tokenSource := oauthCfg.TokenSource(ctx, token)
 	newToken, err := tokenSource.Token()
 	if err != nil {
-		return 0, 0, 0, model.NewAppError(http.StatusUnauthorized, model.ErrCodeGcalTokenExpired, "Token 過期且 refresh 失敗，請重新授權")
+		return nil, model.NewAppError(http.StatusUnauthorized, model.ErrCodeGcalTokenExpired, "Token 過期且 refresh 失敗，請重新授權")
 	}
 
 	// 如果 token 被 refresh 了，更新到 DB
@@ -224,26 +252,35 @@ func (s *GcalService) ImportEvents(ctx context.Context, calendarID string, since
 	client := oauth2.NewClient(ctx, tokenSource)
 	srv, err := calendar.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("建立 Calendar service 失敗: %w", err)
+		return nil, fmt.Errorf("建立 Calendar service 失敗: %w", err)
 	}
 
 	// 列出事件
 	call := srv.Events.List(calendarID).
 		TimeMin(since.Format(time.RFC3339)).
 		TimeMax(until.Format(time.RFC3339)).
-		SingleEvents(includeRecurring).
+		SingleEvents(singleEvents).
 		OrderBy("startTime").
 		MaxResults(500)
 
 	events, err := call.Do()
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("列出 Calendar 事件失敗: %w", err)
+		return nil, fmt.Errorf("列出 Calendar 事件失敗: %w", err)
+	}
+	return events.Items, nil
+}
+
+// ImportEvents 匯入 Google Calendar 事件
+func (s *GcalService) ImportEvents(ctx context.Context, calendarID string, since, until time.Time, includeRecurring bool) (eventsFound, entriesCreated, entriesSkipped int, err error) {
+	items, err := s.ListEvents(ctx, calendarID, since, until, includeRecurring)
+	if err != nil {
+		return 0, 0, 0, err
 	}
 
-	eventsFound = len(events.Items)
+	eventsFound = len(items)
 
 	// 逐筆匯入
-	for _, event := range events.Items {
+	for _, event := range items {
 		// 跳過無 summary 的事件
 		if event.Summary == "" {
 			entriesSkipped++

@@ -10,7 +10,7 @@ import (
 )
 
 // Setup 設定路由
-func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler) *gin.Engine {
+func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler, calendarHandler *handler.CalendarHandler) *gin.Engine {
 	r := gin.Default()
 
 	// CORS middleware — 允許跨網域（前端 localhost:3000 呼叫 API localhost:8080）
@@ -114,6 +114,13 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 		system := v1.Group("/system")
 		{
 			system.GET("/search-config", systemHandler.GetSearchConfig)
+		}
+
+		// 行事曆彙整（F-026b）
+		calendarGroup := v1.Group("/calendar")
+		{
+			calendarGroup.GET("", calendarHandler.Aggregate)
+			calendarGroup.GET("/days/:date", calendarHandler.GetDay)
 		}
 	}
 
