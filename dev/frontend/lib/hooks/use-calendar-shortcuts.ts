@@ -22,8 +22,8 @@ export interface UseCalendarShortcutsParams {
 /**
  * 行事曆鍵盤快捷鍵。
  *
- * - `←` / `k` / `j`：上一步（view 決定步長）
- * - `→` / `l`（注：`j/k` 為 vim 風格的 prev/next；規格允許 j/k or ←/→）
+ * - `←` / `k` / `h`：上一步（view 決定步長）
+ * - `→` / `j` / `l`：下一步（vim 慣例：j 下/next、k 上/prev）
  * - `t`：回到今天
  * - `1` / `m` / `M`：切月視圖
  * - `2` / `w` / `W`：切週視圖
@@ -85,15 +85,15 @@ export function useCalendarShortcuts(params: UseCalendarShortcutsParams): void {
       switch (e.key) {
         case "ArrowLeft":
         case "k":
-        case "j":
-          // 規格：j/k 或 ←/→ 皆為 prev/next；取 j/k 為「上下式」—此處以 j=next, k=prev (vim 常見)
-          // 為貼合 spec（「j/k or ←/→ prev/next」描述兩者皆可），將左鍵與 k/j 其中之一統一。
-          // 這裡選擇：← / k / j 都為 prev（簡化使用者記憶），→ / l 為 next。
+        case "h":
+          // vim 慣例：k 向上 = prev；h 向左 = prev；搭配 ArrowLeft。
           e.preventDefault();
           h.onPrev();
           break;
         case "ArrowRight":
+        case "j":
         case "l":
+          // vim 慣例：j 向下 = next；l 向右 = next；搭配 ArrowRight。
           e.preventDefault();
           h.onNext();
           break;

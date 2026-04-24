@@ -58,13 +58,6 @@ export function DayView({
     return layoutOverlaps(intersect, 3);
   }, [events, ymd, timezone]);
 
-  // 若 caller 有提供 onSelectDate 且目前選取不同於本日，自動同步
-  React.useEffect(() => {
-    if (onSelectDate && selectedDate !== ymd) {
-      // 不在 render 內直接呼叫，避免無限循環；這裡不主動 push（由 caller 控制）
-    }
-  }, [onSelectDate, selectedDate, ymd]);
-
   return (
     <section
       data-testid={CALENDAR_TESTIDS.dayView}
