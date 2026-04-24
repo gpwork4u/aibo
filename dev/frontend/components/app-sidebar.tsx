@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bot,
+  Calendar,
   FileText,
   FolderTree,
   Inbox,
@@ -33,6 +34,7 @@ export function AppSidebar({ inboxCount = 0, open, onClose }: AppSidebarProps) {
 
   const main: NavItem[] = [
     { label: "Inbox", href: "/inbox", icon: Inbox, badge: inboxCount || undefined },
+    { label: "行事曆", href: "/calendar", icon: Calendar },
     { label: "知識條目", href: "/entries", icon: FileText },
     { label: "分類管理", href: "/categories", icon: FolderTree },
     { label: "搜尋", href: "/search", icon: Search },
