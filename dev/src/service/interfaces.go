@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/gpwork4u/aibo/dto"
 	"github.com/gpwork4u/aibo/model"
 	"github.com/gpwork4u/aibo/repository"
 	"github.com/jackc/pgx/v5"
@@ -22,6 +23,8 @@ type EntryRepository interface {
 	GetFlags(ctx context.Context, entryID uuid.UUID) ([]model.EntryFlag, error)
 	ExistsBySourceRef(ctx context.Context, sourceType, sourceRef string) (bool, error)
 	CategoryExists(ctx context.Context, id uuid.UUID) (bool, error)
+	// ListByDateRange 依日期區間撈取 entry（F-026 行事曆彙整 API 使用）
+	ListByDateRange(ctx context.Context, sinceDate, untilDate string, tz string) ([]dto.CalendarEntrySummary, error)
 	// Lifecycle methods (defined in repository/lifecycle.go on EntryRepository)
 	SupersedeEntry(ctx context.Context, oldID, newID uuid.UUID) (*model.Entry, error)
 	ClearSupersede(ctx context.Context, id uuid.UUID) (*model.Entry, error)

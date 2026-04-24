@@ -129,8 +129,12 @@ func main() {
 	lifecycleSvc := service.NewLifecycleService(entryRepo)
 	lifecycleHandler := handler.NewLifecycleHandler(lifecycleSvc)
 
+	// 初始化行事曆彙整服務（F-026b；gcal 5 分鐘 in-memory cache）
+	calendarSvc := service.NewCalendarService(entryRepo, gcalSvc, true)
+	calendarHandler := handler.NewCalendarHandler(calendarSvc)
+
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
