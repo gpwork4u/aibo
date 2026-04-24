@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/gpwork4u/aibo/dto"
 	"github.com/gpwork4u/aibo/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -435,6 +437,82 @@ func (r *EntryRepository) ExistsBySourceRef(ctx context.Context, sourceType, sou
 		sourceType, sourceRef,
 	).Scan(&exists)
 	return exists, err
+}
+
+// ListByDateRange 依日期區間撈取 entry，供行事曆彙整 API 使用。
+//
+// 參數：
+//   - sinceDate / untilDate：YYYY-MM-DD 字串（以 tz 時區解讀），inclusive
+//   - tz：IANA timezone 名稱（如 "UTC", "Asia/Taipei"），決定「一天」邊界
+//
+// 回傳：
+//   - []dto.CalendarEntrySummary，每筆包含 Date 欄位（依 tz 計算的 YYYY-MM-DD），
+//     呼叫端可據此分桶到 CalendarDay。
+//
+// 行為：
+//   - 排除 is_archived=true
+//   - 以 created_at AT TIME ZONE tz 之「當地日」為過濾基準
+//   - 以 created_at ASC 排序
+//
+// 實作注意：PostgreSQL 的 `timestamptz AT TIME ZONE 'X'` 會把 UTC 時間戳轉成 X 時區的
+// local naked timestamp，因此可直接與 $1::date 比較。
+func (r *EntryRepository) ListByDateRange(
+	ctx context.Context,
+	sinceDate, untilDate string,
+	tz string,
+) ([]dto.CalendarEntrySummary, error) {
+	if tz == "" {
+		tz = "UTC"
+	}
+
+	// to_char + AT TIME ZONE：
+	//   created_at 為 timestamptz，AT TIME ZONE $3 會轉成 tz 的 local timestamp
+	//   to_char 產生該時區下的 YYYY-MM-DD，供呼叫端分桶
+	// 過濾條件：
+	//   當地日 >= sinceDate 且 < (untilDate + 1 day)
+	const query = `
+		SELECT id, title, summary, source_type, tags, created_at,
+		       to_char(created_at AT TIME ZONE $3, 'YYYY-MM-DD') AS local_date
+		FROM entries
+		WHERE is_archived = false
+		  AND (created_at AT TIME ZONE $3) >= ($1::date)::timestamp
+		  AND (created_at AT TIME ZONE $3) <  (($2::date + 1))::timestamp
+		ORDER BY created_at ASC
+	`
+
+	rows, err := r.pool.Query(ctx, query, sinceDate, untilDate, tz)
+	if err != nil {
+		return nil, fmt.Errorf("entries.list_by_date_range query: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]dto.CalendarEntrySummary, 0)
+	for rows.Next() {
+		var item dto.CalendarEntrySummary
+		if err := rows.Scan(
+			&item.ID,
+			&item.Title,
+			&item.Summary,
+			&item.SourceType,
+			&item.Tags,
+			&item.CreatedAt,
+			&item.Date,
+		); err != nil {
+			return nil, fmt.Errorf("entries.list_by_date_range scan: %w", err)
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("entries.list_by_date_range rows: %w", err)
+	}
+
+	slog.InfoContext(ctx, "entries.list_by_date_range",
+		"count", len(items),
+		"since", sinceDate,
+		"until", untilDate,
+		"tz", tz,
+	)
+	return items, nil
 }
 
 // CategoryExists 檢查分類是否存在
