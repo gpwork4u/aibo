@@ -11,6 +11,7 @@ import { AppHeader } from "@/components/app-header";
 interface InboxCountResponse {
   count?: number;
   total?: number;
+  pagination?: { total?: number };
 }
 
 export default function DashboardLayout({
@@ -32,16 +33,20 @@ export default function DashboardLayout({
     queryKey: ["inbox", "count"],
     queryFn: async () => {
       try {
-        return await apiClient.get<InboxCountResponse>("/api/v1/inbox/count");
+        // Inbox = category_id=null 且 is_archived=false 的 entries
+        return await apiClient.get<InboxCountResponse>(
+          "/api/v1/entries?category_id=null&is_archived=false&per_page=1",
+        );
       } catch {
-        return { count: 0 };
+        return { count: 0, pagination: { total: 0 } };
       }
     },
     enabled: !!apiKey,
     staleTime: 60_000,
   });
 
-  const inboxCount = data?.count ?? data?.total ?? 0;
+  const inboxCount =
+    data?.pagination?.total ?? data?.count ?? data?.total ?? 0;
 
   if (hydrated && !apiKey) {
     return null;
