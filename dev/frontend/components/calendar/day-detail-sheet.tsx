@@ -93,6 +93,8 @@ export function DayDetailSheet({
         side="right"
         className="w-full sm:max-w-lg"
         data-testid={CALENDAR_TESTIDS.sheet}
+        closeTestId={CALENDAR_TESTIDS.sheetClose}
+        aria-label={date ? `${formatDateLabel(date)} 詳情` : "單日詳情"}
       >
         <SheetHeader>
           <SheetTitle>{date ? formatDateLabel(date) : "單日詳情"}</SheetTitle>

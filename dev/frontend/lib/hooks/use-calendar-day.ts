@@ -19,7 +19,9 @@ export function useCalendarDay(
   opts: { tz: string; includeGcal?: boolean } = { tz: "UTC" },
 ) {
   return useQuery<FetchCalendarDayResult>({
-    queryKey: [...calendarDayKey(date ?? ""), opts.includeGcal ?? true],
+    // 維持 spec 規範的 ['calendar-day', date] 2-element key 讓 invalidateQueries
+    // 能用相同 key 精準匹配；includeGcal 目前固定 true，不納入 key
+    queryKey: calendarDayKey(date ?? ""),
     queryFn: () =>
       fetchCalendarDay(date as string, opts.tz, {
         includeGcal: opts.includeGcal,

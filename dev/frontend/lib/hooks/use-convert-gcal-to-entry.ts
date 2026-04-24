@@ -28,12 +28,25 @@ export function useConvertGcalToEntry() {
   const qc = useQueryClient();
   return useMutation<ConvertEventToEntryResult, unknown, MutationArgs>({
     mutationFn: ({ gcalId, body }) => convertEventToEntry(gcalId, body),
-    onSuccess: (_data, variables) => {
-      toast.success("已轉成知識條目");
+    onSuccess: (data, variables) => {
+      // 成功 toast 附「查看」action 跳轉至新 entry（spec 要求）
+      const entryId = typeof data?.id === "string" ? data.id : null;
+      toast.success("已轉為知識條目", {
+        action: entryId
+          ? {
+              label: "查看",
+              onClick: () => {
+                if (typeof window !== "undefined") {
+                  window.location.href = `/entries/${entryId}`;
+                }
+              },
+            }
+          : undefined,
+      });
       qc.invalidateQueries({ queryKey: ["calendar"] });
       qc.invalidateQueries({ queryKey: calendarDayKey(variables.date) });
     },
-    onError: (err) => {
+    onError: (err, variables) => {
       const mapped = convertEventErrorMessage(err);
       if (!mapped) {
         toast.error("轉換失敗");
@@ -41,9 +54,10 @@ export function useConvertGcalToEntry() {
       }
       switch (mapped.code) {
         case "ALREADY_LINKED":
-          // 已存在：重新載入當日讓 linked_entry_id 出現
+          // 已存在：invalidate 讓 linked_entry_id 能從伺服器重新載入，UI 顯示連結
           toast.info(mapped.message);
-          // invalidate 交由 caller 自己處理
+          qc.invalidateQueries({ queryKey: ["calendar"] });
+          qc.invalidateQueries({ queryKey: calendarDayKey(variables.date) });
           break;
         case "GCAL_NOT_CONNECTED":
           toast.error(mapped.message, {
