@@ -8,6 +8,7 @@ import { MonthView } from "@/components/calendar/month-view";
 import { WeekView } from "@/components/calendar/week-view";
 import { DayView } from "@/components/calendar/day-view";
 import { GcalBanner } from "@/components/calendar/gcal-banner";
+import { DayDetailSheet } from "@/components/calendar/day-detail-sheet";
 import { ErrorState } from "@/components/error-state";
 import {
   addDays,
@@ -49,6 +50,7 @@ export default function CalendarPage() {
 
   const viewParam = searchParams.get("view");
   const dateParam = searchParams.get("date");
+  const sheetParam = searchParams.get("sheet"); // F-027c: 開啟 DayDetailSheet 的 YYYY-MM-DD
   const urlView: CalendarView = parseView(viewParam);
   // 手機 (< 768px) 強制 day view（URL 可保留 ?view=month 以利 desktop 分享）
   const view: CalendarView = isMobile ? "day" : urlView;
@@ -100,11 +102,13 @@ export default function CalendarPage() {
 
   // URL 同步工具
   const updateUrl = React.useCallback(
-    (next: { view?: CalendarView; date?: string | null }) => {
+    (next: { view?: CalendarView; date?: string | null; sheet?: string | null }) => {
       const sp = new URLSearchParams(searchParams.toString());
       if (next.view) sp.set("view", next.view);
       if (next.date === null) sp.delete("date");
       else if (next.date) sp.set("date", next.date);
+      if (next.sheet === null) sp.delete("sheet");
+      else if (next.sheet) sp.set("sheet", next.sheet);
       router.replace(`/calendar?${sp.toString()}`);
     },
     [router, searchParams],
@@ -148,8 +152,13 @@ export default function CalendarPage() {
   );
 
   const handleSelectDate = (ymd: string) => {
-    updateUrl({ date: ymd });
+    // 點擊 day cell → 定位到該日 + 開啟 DayDetailSheet
+    updateUrl({ date: ymd, sheet: ymd });
   };
+
+  const handleCloseSheet = React.useCallback(() => {
+    updateUrl({ sheet: null });
+  }, [updateUrl]);
 
   // PgUp/PgDn：大步移動
   const handleLargeShift = React.useCallback(
@@ -223,6 +232,12 @@ export default function CalendarPage() {
           onSelectDate={handleSelectDate}
         />
       )}
+
+      <DayDetailSheet
+        date={sheetParam}
+        tz={tz}
+        onClose={handleCloseSheet}
+      />
     </div>
   );
 }
