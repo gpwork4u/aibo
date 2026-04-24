@@ -74,6 +74,43 @@ var _ service.EntryRepository = (*mockEntryRepo)(nil)
 // 確保 pgx import 被使用（interface 內有用到 pgx.Tx 但 mock 不需要）
 var _ = pgx.ErrNoRows
 
+// --------- Stub GcalIntegrationRepository ---------
+//
+// 供 newStubGcalService 使用；Get 回傳 integration=nil 代表「未連 gcal」，
+// 其他方法為空實作（本測試不觸發）。
+type stubGcalRepo struct {
+	integration *model.GcalIntegration
+	getErr      error
+}
+
+func (s *stubGcalRepo) Get(_ context.Context) (*model.GcalIntegration, error) {
+	return s.integration, s.getErr
+}
+func (s *stubGcalRepo) Upsert(_ context.Context, _ *model.GcalIntegration) error { return nil }
+func (s *stubGcalRepo) UpdateTokens(_ context.Context, _ interface{}, _, _ string, _ interface{}) error {
+	return nil
+}
+func (s *stubGcalRepo) SaveOAuthState(_ context.Context, _ string) error { return nil }
+func (s *stubGcalRepo) ValidateOAuthState(_ context.Context, _ string) (bool, error) {
+	return false, nil
+}
+func (s *stubGcalRepo) CleanExpiredOAuthStates(_ context.Context) error { return nil }
+
+// 編譯期介面檢查
+var _ service.GcalIntegrationRepository = (*stubGcalRepo)(nil)
+
+// newStubGcalService 建立可用於單測的 *GcalService：
+//
+//   - 使用 stubGcalRepo（可控 Get 行為模擬已連 / 未連）
+//   - entryRepo = nil（本測試 gcalSvc 不被呼叫 ListEvents / Create）
+//   - aesCrypto = nil（本測試走 IsConnected 路徑，不解密 token）
+//   - config = 空（本測試不走 OAuth 流程）
+//
+// IsConnected() 只讀 gcalRepo.Get，會依 integration 欄位決定 true / false。
+func newStubGcalService(repo *stubGcalRepo) *service.GcalService {
+	return service.NewGcalService(repo, nil, nil, &service.GcalConfig{})
+}
+
 // --------- Helpers ---------
 
 func mkEntry(id uuid.UUID, title string, createdAt time.Time, date string) dto.CalendarEntrySummary {

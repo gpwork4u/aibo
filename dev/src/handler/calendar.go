@@ -46,7 +46,12 @@ func (h *CalendarHandler) Aggregate(c *gin.Context) {
 		return
 	}
 
+	// include_gcal 分為三態：
+	//   - 明確 true：要求一定要整合 gcal；未連 gcal → 424 GCAL_NOT_CONNECTED（對齊 spec）
+	//   - 明確 false：完全跳過 gcal
+	//   - 未指定（預設 true）：盡力整合，未連時走 degraded（200 + gcal_connected=false）
 	includeGcal := true
+	explicitIncludeGcal := false
 	if v := c.Query("include_gcal"); v != "" {
 		parsed, err := strconv.ParseBool(v)
 		if err != nil {
@@ -57,6 +62,7 @@ func (h *CalendarHandler) Aggregate(c *gin.Context) {
 			return
 		}
 		includeGcal = parsed
+		explicitIncludeGcal = true
 	}
 
 	calendarID := c.DefaultQuery("calendar_id", "primary")
@@ -75,9 +81,16 @@ func (h *CalendarHandler) Aggregate(c *gin.Context) {
 		return
 	}
 
-	// 未連 gcal 但 include_gcal=true：回 200 + X-Degraded: gcal（不回 424）
-	// 這是本 PR 採用的語意：把「未連」當作 degraded（前端可透過 gcal_connected 或 X-Degraded 判斷）。
-	// Spec 另有 424 GCAL_NOT_CONNECTED 的選項，但為了讓行事曆主流程不卡住，採 degraded。
+	// 明確 include_gcal=true 但 gcal 未連 → 424（spec 要求）
+	if explicitIncludeGcal && includeGcal && !result.GcalConnected {
+		c.JSON(http.StatusFailedDependency, dto.ErrorResponse{
+			Code:    model.ErrCodeGcalNotConnected,
+			Message: "尚未連接 Google Calendar，無法整合事件。請先完成 OAuth 授權。",
+		})
+		return
+	}
+
+	// 其他 degraded 情境（gcal upstream 失敗，或未指定 include_gcal 時未連）→ 200 + X-Degraded: gcal
 	if result.Degraded {
 		c.Header("X-Degraded", "gcal")
 	}
