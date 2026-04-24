@@ -210,3 +210,207 @@ function ymdFromUtc(d: Date): string {
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
 }
+
+// ---------------------------------------------------------------------------
+// 週/日視圖輔助（F-027b）
+// ---------------------------------------------------------------------------
+
+/** 時間軸顯示範圍（week/day view 共用）。 */
+export const TIME_AXIS_START_HOUR = 6;
+export const TIME_AXIS_END_HOUR = 24; // exclusive；顯示最後一格為 23:00
+export const TIME_AXIS_HOUR_PX = 48;
+
+/** 產生 `[6, 7, ..., 23]`（18 個）。 */
+export function timeAxisHours(): number[] {
+  const arr: number[] = [];
+  for (let h = TIME_AXIS_START_HOUR; h < TIME_AXIS_END_HOUR; h++) arr.push(h);
+  return arr;
+}
+
+/** 由週錨點產生一週 7 天（週一起）的日期清單。 */
+export function buildWeekDays(
+  anchor: Date,
+  tz: string,
+  weekStartsOn: 0 | 1 = 1,
+): Array<{ ymd: string; date: Date; dow: number }> {
+  const { since } = getWeekRange(anchor, tz, weekStartsOn);
+  const days: Array<{ ymd: string; date: Date; dow: number }> = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(since);
+    d.setUTCDate(d.getUTCDate() + i);
+    days.push({ ymd: ymdFromUtc(d), date: d, dow: d.getUTCDay() });
+  }
+  return days;
+}
+
+/**
+ * 取得 event 在指定 tz 下的「該日 start/end 分鐘數」（自 00:00 起算）。
+ * 若 event 不與該日相交則回 null。
+ *
+ * 範例：
+ *   - event 2026-04-24 09:00–10:30 Asia/Taipei，dayYmd=2026-04-24 → {startMin:540, endMin:630, continuesFromPrev:false, continuesToNext:false}
+ *   - event 2026-04-24 23:00–2026-04-25 01:00，dayYmd=2026-04-25 → {startMin:0, endMin:60, continuesFromPrev:true, continuesToNext:false}
+ */
+export interface EventDayClip {
+  /** 該日開始分鐘（0-1440） */
+  startMin: number;
+  /** 該日結束分鐘（0-1440，可等於 1440 表示持續至午夜） */
+  endMin: number;
+  /** 是否由前一日延續（需顯示「續」標示） */
+  continuesFromPrev: boolean;
+  /** 是否延續至次日 */
+  continuesToNext: boolean;
+}
+
+/**
+ * 將 ISO 時間字串在 tz 下轉為 { ymd, minutesFromMidnight }。
+ */
+export function zonedYmdAndMinutes(
+  iso: string,
+  tz: string,
+): { ymd: string; minutes: number } | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  // 部件化取得
+  const parts = fmt.formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
+  const y = Number(get("year"));
+  const mo = Number(get("month"));
+  const da = Number(get("day"));
+  let hh = Number(get("hour"));
+  const mm = Number(get("minute"));
+  // en-CA / hour12:false 在某些平台會回傳 "24" 作為凌晨——標準化成 0
+  if (hh === 24) hh = 0;
+  const ymd = `${y}-${pad2(mo)}-${pad2(da)}`;
+  return { ymd, minutes: hh * 60 + mm };
+}
+
+/**
+ * 判斷 event 是否與指定日相交，並回傳該日內的時段區間（分鐘）。
+ *
+ * - all_day：視為佔滿整日（start=0,end=1440）。跨多日 all_day 會在每天都相交。
+ * - 一般：依 tz 下的 ymd 判斷。
+ */
+export function clipEventToDay(
+  event: { start: string; end: string; all_day: boolean },
+  dayYmd: string,
+  tz: string,
+): EventDayClip | null {
+  if (event.all_day) {
+    const startYmd = zonedYmdAndMinutes(event.start, tz)?.ymd;
+    const endYmdRaw = zonedYmdAndMinutes(event.end, tz);
+    // gcal all-day 的 end 為排他（次日 00:00）——所以比較時需減 1 分鐘判斷
+    if (!startYmd || !endYmdRaw) return null;
+    // 若 end 為 00:00，視為前一日結束
+    const endYmd =
+      endYmdRaw.minutes === 0 ? ymdMinusOne(endYmdRaw.ymd) : endYmdRaw.ymd;
+    if (dayYmd < startYmd || dayYmd > endYmd) return null;
+    return {
+      startMin: 0,
+      endMin: 24 * 60,
+      continuesFromPrev: dayYmd > startYmd,
+      continuesToNext: dayYmd < endYmd,
+    };
+  }
+
+  const s = zonedYmdAndMinutes(event.start, tz);
+  const e = zonedYmdAndMinutes(event.end, tz);
+  if (!s || !e) return null;
+
+  // 若 end 落在 00:00，視為前一日 24:00（避免顯示 0 長度於 00:00 當天）
+  let endYmd = e.ymd;
+  let endMinutes = e.minutes;
+  if (e.minutes === 0 && e.ymd > s.ymd) {
+    endYmd = ymdMinusOne(e.ymd);
+    endMinutes = 24 * 60;
+  }
+
+  if (dayYmd < s.ymd || dayYmd > endYmd) return null;
+
+  const startMin = dayYmd === s.ymd ? s.minutes : 0;
+  const endMin = dayYmd === endYmd ? endMinutes : 24 * 60;
+
+  // 防呆：若同一天但 end <= start（資料異常），設最少 15 分鐘以仍可渲染
+  const normalizedEndMin =
+    dayYmd === s.ymd && dayYmd === endYmd && endMin <= startMin
+      ? Math.min(startMin + 15, 24 * 60)
+      : endMin;
+
+  return {
+    startMin,
+    endMin: normalizedEndMin,
+    continuesFromPrev: dayYmd > s.ymd,
+    continuesToNext: dayYmd < endYmd,
+  };
+}
+
+/**
+ * 從一組 events 中挑出與指定日相交的、並回傳含裁切資訊的結果。
+ *
+ * 回傳依 startMin 排序。
+ */
+export function eventsIntersectingDay<
+  T extends { start: string; end: string; all_day: boolean },
+>(
+  events: T[],
+  dayYmd: string,
+  tz: string,
+): Array<{ event: T; clip: EventDayClip }> {
+  const out: Array<{ event: T; clip: EventDayClip }> = [];
+  for (const ev of events) {
+    const clip = clipEventToDay(ev, dayYmd, tz);
+    if (clip) out.push({ event: ev, clip });
+  }
+  out.sort((a, b) => a.clip.startMin - b.clip.startMin);
+  return out;
+}
+
+/** YYYY-MM-DD 減一日（純字串運算，經由 Date UTC）。 */
+function ymdMinusOne(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  return ymdFromUtc(dt);
+}
+
+/** 由分鐘數換算時間軸頂部 px 位置（相對 06:00 起算）。 */
+export function minutesToAxisTopPx(min: number): number {
+  return ((min - TIME_AXIS_START_HOUR * 60) / 60) * TIME_AXIS_HOUR_PX;
+}
+
+/** 將時間區段換算為 { topPx, heightPx }；會 clamp 到 [06:00, 24:00]。 */
+export function clipToAxisPx(startMin: number, endMin: number): {
+  topPx: number;
+  heightPx: number;
+  clippedFromTop: boolean;
+  clippedFromBottom: boolean;
+} {
+  const axisStart = TIME_AXIS_START_HOUR * 60;
+  const axisEnd = TIME_AXIS_END_HOUR * 60;
+  const s = Math.max(startMin, axisStart);
+  const e = Math.min(endMin, axisEnd);
+  const topPx = ((s - axisStart) / 60) * TIME_AXIS_HOUR_PX;
+  const heightPx = Math.max(20, ((e - s) / 60) * TIME_AXIS_HOUR_PX);
+  return {
+    topPx,
+    heightPx,
+    clippedFromTop: startMin < axisStart,
+    clippedFromBottom: endMin > axisEnd,
+  };
+}
+
+/** 格式化分鐘為 HH:MM（24 小時制）。 */
+export function formatMinutes(min: number): string {
+  const h = Math.floor(min / 60) % 24;
+  const m = min % 60;
+  return `${pad2(h)}:${pad2(m)}`;
+}

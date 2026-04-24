@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { MonthView } from "@/components/calendar/month-view";
+import { WeekView } from "@/components/calendar/week-view";
+import { DayView } from "@/components/calendar/day-view";
 import { GcalBanner } from "@/components/calendar/gcal-banner";
 import { ErrorState } from "@/components/error-state";
 import {
@@ -21,6 +23,8 @@ import {
   todayInTz,
 } from "@/lib/calendar/date-utils";
 import { useCalendar } from "@/lib/hooks/use-calendar";
+import { useIsMobile } from "@/lib/hooks/use-is-mobile";
+import { useCalendarShortcuts } from "@/lib/hooks/use-calendar-shortcuts";
 import type { CalendarDay } from "@/lib/api/calendar";
 import type { CalendarView } from "@/components/calendar/calendar-toolbar";
 import { CALENDAR_TESTIDS } from "@/lib/calendar/testids";
@@ -41,16 +45,19 @@ export default function CalendarPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tz = React.useMemo(resolveTimezone, []);
+  const isMobile = useIsMobile();
 
   const viewParam = searchParams.get("view");
   const dateParam = searchParams.get("date");
-  const view: CalendarView = parseView(viewParam);
+  const urlView: CalendarView = parseView(viewParam);
+  // 手機 (< 768px) 強制 day view（URL 可保留 ?view=month 以利 desktop 分享）
+  const view: CalendarView = isMobile ? "day" : urlView;
   const parsedDate = parseYmd(dateParam);
   const anchorDate = parsedDate ?? todayInTz(tz);
   const selectedYmd = parsedDate ? formatYmd(parsedDate, tz) : undefined;
   const todayYmd = formatYmd(todayInTz(tz), tz);
 
-  // 計算本次要 fetch 的區間（本 PR 只實作 month；week/day 為 placeholder）
+  // 計算本次要 fetch 的區間
   const range = React.useMemo(() => {
     if (view === "month") return getMonthGridRange(anchorDate, tz);
     if (view === "week") return getWeekRange(anchorDate, tz);
@@ -103,6 +110,14 @@ export default function CalendarPage() {
     [router, searchParams],
   );
 
+  const shiftDate = React.useCallback(
+    (deltaDays: number) => {
+      const next = addDays(anchorDate, deltaDays, tz);
+      updateUrl({ date: formatYmd(next, tz) });
+    },
+    [anchorDate, tz, updateUrl],
+  );
+
   const handlePrev = () => {
     let nextDate: Date;
     if (view === "month") nextDate = addMonths(anchorDate, -1, tz);
@@ -123,31 +138,41 @@ export default function CalendarPage() {
     updateUrl({ date: todayYmd });
   };
 
-  const handleViewChange = (v: CalendarView) => {
-    updateUrl({ view: v });
-  };
+  const handleViewChange = React.useCallback(
+    (v: CalendarView) => {
+      // 手機強制 day 時，不允許切成其他 view（toolbar tabs 已隱藏；此處 extra guard）
+      if (isMobile && v !== "day") return;
+      updateUrl({ view: v });
+    },
+    [isMobile, updateUrl],
+  );
 
   const handleSelectDate = (ymd: string) => {
-    // 本 PR 只同步 URL date（Sheet 由 F-027c 實作）
     updateUrl({ date: ymd });
   };
 
-  // 手機版強制 day view
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.matchMedia && window.matchMedia("(max-width: 767px)").matches) {
-      if (view !== "day") {
-        updateUrl({ view: "day" });
-      }
-    }
-    // 僅在 mount 時檢查一次
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // PgUp/PgDn：大步移動
+  const handleLargeShift = React.useCallback(
+    (dir: -1 | 1) => {
+      let next: Date;
+      if (view === "month") next = addMonths(anchorDate, dir, tz);
+      else if (view === "week") next = addWeeks(anchorDate, dir * 4, tz);
+      else next = addDays(anchorDate, dir * 7, tz);
+      updateUrl({ date: formatYmd(next, tz) });
+    },
+    [view, anchorDate, tz, updateUrl],
+  );
 
-  const hideViewTabs =
-    typeof window !== "undefined" &&
-    window.matchMedia &&
-    window.matchMedia("(max-width: 767px)").matches;
+  // 鍵盤快捷鍵
+  useCalendarShortcuts({
+    view,
+    onPrev: handlePrev,
+    onNext: handleNext,
+    onToday: handleToday,
+    onPrevLarge: () => handleLargeShift(-1),
+    onNextLarge: () => handleLargeShift(1),
+    onSetView: handleViewChange,
+  });
 
   return (
     <div data-testid={CALENDAR_TESTIDS.page} className="flex flex-col gap-4">
@@ -159,7 +184,7 @@ export default function CalendarPage() {
         onNext={handleNext}
         onToday={handleToday}
         timezone={tz}
-        hideViewTabs={hideViewTabs}
+        hideViewTabs={isMobile}
         isLoading={isLoading}
       />
 
@@ -180,32 +205,24 @@ export default function CalendarPage() {
           onSelectDate={handleSelectDate}
         />
       ) : view === "week" ? (
-        <WeekViewPlaceholder />
+        <WeekView
+          anchorDate={anchorDate}
+          timezone={tz}
+          todayYmd={todayYmd}
+          daysMap={daysMap}
+          selectedDate={selectedYmd}
+          onSelectDate={handleSelectDate}
+        />
       ) : (
-        <DayViewPlaceholder />
+        <DayView
+          anchorDate={anchorDate}
+          timezone={tz}
+          todayYmd={todayYmd}
+          day={daysMap.get(formatYmd(anchorDate, tz))}
+          selectedDate={selectedYmd}
+          onSelectDate={handleSelectDate}
+        />
       )}
-    </div>
-  );
-}
-
-function WeekViewPlaceholder() {
-  return (
-    <div
-      data-testid={CALENDAR_TESTIDS.weekView}
-      className="rounded-md border bg-muted/20 p-8 text-center text-sm text-muted-foreground"
-    >
-      週視圖即將推出（F-027b）
-    </div>
-  );
-}
-
-function DayViewPlaceholder() {
-  return (
-    <div
-      data-testid={CALENDAR_TESTIDS.dayView}
-      className="rounded-md border bg-muted/20 p-8 text-center text-sm text-muted-foreground"
-    >
-      日視圖即將推出（F-027b）
     </div>
   );
 }
