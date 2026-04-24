@@ -9,11 +9,10 @@ CREATE INDEX idx_entries_domains ON entries USING GIN (domains);
 CREATE INDEX idx_entries_context ON entries USING GIN (context jsonb_path_ops);
 
 -- 更新 FTS 索引：加入 domains 到權重 A
+-- 注意：array_to_string() 不是 IMMUTABLE，不放入 index；domains/tags 搜尋由獨立 GIN 索引負責
 DROP INDEX IF EXISTS idx_entries_fts;
 CREATE INDEX idx_entries_fts ON entries USING GIN (
   (setweight(to_tsvector('simple', coalesce(summary, '')), 'A') ||
    setweight(to_tsvector('simple', coalesce(title, '')), 'A') ||
-   setweight(to_tsvector('simple', coalesce(array_to_string(tags, ' '), '')), 'A') ||
-   setweight(to_tsvector('simple', coalesce(array_to_string(domains, ' '), '')), 'A') ||
    setweight(to_tsvector('simple', coalesce(content, '')), 'B'))
 );

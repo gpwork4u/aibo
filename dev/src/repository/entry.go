@@ -157,8 +157,8 @@ func (r *EntryRepository) List(ctx context.Context, filter model.EntryFilter) (*
 			   setweight(to_tsvector('simple', coalesce(e.content, '')), 'B'))
 			  @@ plainto_tsquery('simple', $%d)
 			 OR (coalesce(e.summary,'') || ' ' || coalesce(e.title,'') || ' ' || coalesce(e.content,''))
-			    LIKE '%%' || $%d || '%%' ESCAPE '\\'
-			 OR EXISTS (SELECT 1 FROM unnest(e.tags) AS t WHERE t ILIKE '%%' || $%d || '%%' ESCAPE '\\'))`,
+			    LIKE '%%' || $%d || '%%' ESCAPE '\'
+			 OR EXISTS (SELECT 1 FROM unnest(e.tags) AS t WHERE t ILIKE '%%' || $%d || '%%' ESCAPE '\'))`,
 			argIdx, escapedArgIdx, escapedArgIdx,
 		)
 		conditions = append(conditions, searchCondition)
