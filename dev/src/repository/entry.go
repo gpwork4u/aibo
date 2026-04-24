@@ -13,6 +13,7 @@ import (
 	"github.com/gpwork4u/aibo/dto"
 	"github.com/gpwork4u/aibo/model"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -41,6 +42,23 @@ func (r *EntryRepository) Create(ctx context.Context, entry *model.Entry) error 
 		entry.Tags, entry.Domains, entry.Context, entry.IsArchived, qualityFlagsJSON, entry.CreatedAt, entry.UpdatedAt,
 	)
 	if err != nil {
+		// 優先用 pgconn.PgError.ConstraintName 判斷（結構化欄位，
+		// 不受 PG 版本 / lc_messages 影響）
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			switch pgErr.ConstraintName {
+			case "uq_entries_gcal_ref":
+				return model.NewAppError(409, model.ErrCodeAlreadyLinked, "此 Google Calendar event 已轉成 entry")
+			case "idx_entries_source":
+				return model.NewAppError(409, model.ErrCodeDuplicateSource, "相同 source_type + source_ref 已存在")
+			case "chk_title_or_content":
+				return model.NewAppError(400, model.ErrCodeInvalidInput, "title 和 content 至少需要填寫一個")
+			}
+		}
+		// Fallback：保留既有 strings.Contains 判斷（涵蓋非 PgError 錯誤路徑）
+		if strings.Contains(err.Error(), "uq_entries_gcal_ref") {
+			return model.NewAppError(409, model.ErrCodeAlreadyLinked, "此 Google Calendar event 已轉成 entry")
+		}
 		if strings.Contains(err.Error(), "idx_entries_source") {
 			return model.NewAppError(409, model.ErrCodeDuplicateSource, "相同 source_type + source_ref 已存在")
 		}

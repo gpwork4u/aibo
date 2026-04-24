@@ -10,7 +10,7 @@ import (
 )
 
 // Setup 設定路由
-func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler) *gin.Engine {
+func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler) *gin.Engine {
 	r := gin.Default()
 
 	// CORS middleware — 允許跨網域（前端 localhost:3000 呼叫 API localhost:8080）
@@ -76,6 +76,14 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 			// LLM 自動分類
 			entries.POST("/:id/classify", classifyHandler.Classify)
 			entries.POST("/classify-all", classifyHandler.ClassifyAll)
+		}
+
+		// 行事曆（F-026c：gcal event → entry 轉換）
+		//
+		// 此 group 目前只掛 to-entry；F-026b 的 List/GetDay 由另一支 handler 於其 PR 追加。
+		calendar := v1.Group("/calendar")
+		{
+			calendar.POST("/events/:gcal_id/to-entry", calendarConvertHandler.ConvertToEntry)
 		}
 
 		// Google Calendar 整合

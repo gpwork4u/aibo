@@ -106,6 +106,10 @@ func main() {
 	gcalSvc := service.NewGcalService(gcalRepo, entryRepo, aesCrypto, gcalConfig)
 	gcalHandler := handler.NewGcalHandler(gcalSvc)
 
+	// 行事曆轉換（F-026c）
+	calendarConvertSvc := service.NewCalendarConvertService(gcalSvc, entryRepo)
+	calendarConvertHandler := handler.NewCalendarConvertHandler(calendarConvertSvc)
+
 	// 初始化搜尋服務
 	searchRepo := repository.NewSearchRepository(pool)
 	searchSvc := service.NewSearchService(llmSvc, searchRepo)
@@ -126,7 +130,7 @@ func main() {
 	lifecycleHandler := handler.NewLifecycleHandler(lifecycleSvc)
 
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{

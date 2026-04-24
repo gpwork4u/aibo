@@ -17,6 +17,9 @@ const (
 	ErrCodeGcalTokenExpired  = "GCAL_TOKEN_EXPIRED"
 	ErrCodeCalendarNotFound  = "CALENDAR_NOT_FOUND"
 	ErrCodeCircularSupersede = "CIRCULAR_SUPERSEDE"
+	ErrCodeAlreadyLinked     = "ALREADY_LINKED"
+	ErrCodeEventNotFound     = "EVENT_NOT_FOUND"
+	ErrCodeGcalUpstream      = "GCAL_UPSTREAM_ERROR"
 )
 
 // AppError 應用程式錯誤

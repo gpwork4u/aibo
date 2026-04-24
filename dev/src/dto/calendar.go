@@ -50,6 +50,18 @@ type CalendarDay struct {
 	Events     []CalendarEventSummary `json:"events"`
 }
 
+// ToEntryRequest POST /api/v1/calendar/events/:gcal_id/to-entry 的請求 body
+//
+// 所有欄位皆為選填：
+//   - CalendarID：預設 "primary"
+//   - TitleOverride：若提供則覆蓋預設標題（"[GCal] " + summary）
+//   - ContentOverride：若提供則覆蓋預設內容（time/location/description 組合）
+type ToEntryRequest struct {
+	CalendarID      *string `json:"calendar_id"`
+	TitleOverride   *string `json:"title_override"`
+	ContentOverride *string `json:"content_override"`
+}
+
 // CalendarResponse GET /api/v1/calendar 的主回應
 type CalendarResponse struct {
 	Since string        `json:"since"`

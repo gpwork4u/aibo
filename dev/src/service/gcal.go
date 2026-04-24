@@ -15,6 +15,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/calendar/v3"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 )
 
@@ -297,6 +298,105 @@ func (s *GcalService) ImportEvents(ctx context.Context, calendarID string, since
 	)
 
 	return eventsFound, entriesCreated, entriesSkipped, nil
+}
+
+// GetEvent 取得指定 calendar 上的單一 event。
+//
+// 錯誤映射：
+//   - 使用者尚未連 gcal → model.AppError{424, GCAL_NOT_CONNECTED}
+//   - token 過期且 refresh 失敗 → model.AppError{401, GCAL_TOKEN_EXPIRED}
+//   - Google API 回 404 → model.AppError{404, EVENT_NOT_FOUND}
+//   - 其他 Google API 錯誤 → model.AppError{502, GCAL_UPSTREAM_ERROR}
+//
+// 回傳的 *calendar.Event 為 Google API 原始型別，由呼叫端（service 層）自行組裝成 entry。
+func (s *GcalService) GetEvent(ctx context.Context, calendarID, eventID string) (*calendar.Event, error) {
+	if calendarID == "" {
+		calendarID = "primary"
+	}
+
+	// 取得整合資訊
+	integration, err := s.gcalRepo.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("查詢 GcalIntegration 失敗: %w", err)
+	}
+	if integration == nil {
+		return nil, model.NewAppError(http.StatusFailedDependency, model.ErrCodeGcalNotConnected, "Google Calendar 尚未授權")
+	}
+
+	// 解密 tokens
+	accessToken, err := s.aesCrypto.Decrypt(integration.AccessToken)
+	if err != nil {
+		return nil, fmt.Errorf("解密 access_token 失敗: %w", err)
+	}
+	refreshToken, err := s.aesCrypto.Decrypt(integration.RefreshToken)
+	if err != nil {
+		return nil, fmt.Errorf("解密 refresh_token 失敗: %w", err)
+	}
+	clientSecret, err := s.aesCrypto.Decrypt(integration.ClientSecret)
+	if err != nil {
+		return nil, fmt.Errorf("解密 client_secret 失敗: %w", err)
+	}
+
+	token := &oauth2.Token{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+		Expiry:       integration.TokenExpiry,
+	}
+	oauthCfg := &oauth2.Config{
+		ClientID:     integration.ClientID,
+		ClientSecret: clientSecret,
+		RedirectURL:  s.config.RedirectURL,
+		Scopes:       []string{calendar.CalendarReadonlyScope},
+		Endpoint:     google.Endpoint,
+	}
+
+	tokenSource := oauthCfg.TokenSource(ctx, token)
+	newToken, err := tokenSource.Token()
+	if err != nil {
+		return nil, model.NewAppError(http.StatusUnauthorized, model.ErrCodeGcalTokenExpired, "Token 過期且 refresh 失敗，請重新授權")
+	}
+
+	// refresh 後持久化
+	if newToken.AccessToken != accessToken {
+		slog.Info("Google Calendar token 已自動 refresh")
+		encNewAccess, encErr := s.aesCrypto.Encrypt(newToken.AccessToken)
+		if encErr == nil {
+			encNewRefresh := integration.RefreshToken
+			if newToken.RefreshToken != "" && newToken.RefreshToken != refreshToken {
+				encNewRefresh, _ = s.aesCrypto.Encrypt(newToken.RefreshToken)
+			}
+			_ = s.gcalRepo.UpdateTokens(ctx, integration.ID, encNewAccess, encNewRefresh, newToken.Expiry)
+		}
+	}
+
+	client := oauth2.NewClient(ctx, tokenSource)
+	srv, err := calendar.NewService(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		return nil, fmt.Errorf("建立 Calendar service 失敗: %w", err)
+	}
+
+	event, err := srv.Events.Get(calendarID, eventID).Context(ctx).Do()
+	if err != nil {
+		return nil, mapGcalAPIError(err)
+	}
+	return event, nil
+}
+
+// mapGcalAPIError 將 Google API 錯誤對應到 AppError。
+//
+// 404 → EVENT_NOT_FOUND；其餘 → GCAL_UPSTREAM_ERROR 502。
+func mapGcalAPIError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if gErr, ok := err.(*googleapi.Error); ok {
+		if gErr.Code == http.StatusNotFound {
+			return model.NewAppError(http.StatusNotFound, model.ErrCodeEventNotFound, "Google Calendar 找不到該 event")
+		}
+		return model.NewAppError(http.StatusBadGateway, model.ErrCodeGcalUpstream, fmt.Sprintf("Google Calendar API 錯誤: %d %s", gErr.Code, gErr.Message))
+	}
+	return model.NewAppError(http.StatusBadGateway, model.ErrCodeGcalUpstream, "Google Calendar API 錯誤: "+err.Error())
 }
 
 // buildEventContent 建構事件內容
