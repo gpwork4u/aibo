@@ -41,6 +41,9 @@ func (r *EntryRepository) Create(ctx context.Context, entry *model.Entry) error 
 		entry.Tags, entry.Domains, entry.Context, entry.IsArchived, qualityFlagsJSON, entry.CreatedAt, entry.UpdatedAt,
 	)
 	if err != nil {
+		if strings.Contains(err.Error(), "uq_entries_gcal_ref") {
+			return model.NewAppError(409, model.ErrCodeAlreadyLinked, "此 Google Calendar event 已轉成 entry")
+		}
 		if strings.Contains(err.Error(), "idx_entries_source") {
 			return model.NewAppError(409, model.ErrCodeDuplicateSource, "相同 source_type + source_ref 已存在")
 		}
