@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gpwork4u/aibo/dto"
@@ -443,7 +444,8 @@ func (r *EntryRepository) ExistsBySourceRef(ctx context.Context, sourceType, sou
 //
 // 參數：
 //   - sinceDate / untilDate：YYYY-MM-DD 字串（以 tz 時區解讀），inclusive
-//   - tz：IANA timezone 名稱（如 "UTC", "Asia/Taipei"），決定「一天」邊界
+//   - tz：IANA timezone 名稱（如 "UTC", "Asia/Taipei"），決定「一天」邊界；
+//     空字串視為 "UTC"；無效 tz 回傳 400 錯誤。
 //
 // 回傳：
 //   - []dto.CalendarEntrySummary，每筆包含 Date 欄位（依 tz 計算的 YYYY-MM-DD），
@@ -451,11 +453,17 @@ func (r *EntryRepository) ExistsBySourceRef(ctx context.Context, sourceType, sou
 //
 // 行為：
 //   - 排除 is_archived=true
-//   - 以 created_at AT TIME ZONE tz 之「當地日」為過濾基準
 //   - 以 created_at ASC 排序
 //
-// 實作注意：PostgreSQL 的 `timestamptz AT TIME ZONE 'X'` 會把 UTC 時間戳轉成 X 時區的
-// local naked timestamp，因此可直接與 $1::date 比較。
+// 實作策略（SQL index 友善）：
+//
+//	本方法在 Go 層把「tz 下 since..until 整日區間」換算成 UTC 的
+//	[startUTC, endUTC) 絕對時間戳範圍，SQL 用 created_at >= $1 AND created_at < $2
+//	過濾，這樣可直接命中 idx_entries_created_at btree index，避免 functional
+//	index + 時區表達式不匹配造成的 seq scan。
+//
+//	Date 欄位仍由 SQL 用 `created_at AT TIME ZONE $3` 轉出當地日字串，
+//	供呼叫端分桶；此欄位出現在 SELECT list，不影響 WHERE 的 index 命中。
 func (r *EntryRepository) ListByDateRange(
 	ctx context.Context,
 	sinceDate, untilDate string,
@@ -465,22 +473,41 @@ func (r *EntryRepository) ListByDateRange(
 		tz = "UTC"
 	}
 
-	// to_char + AT TIME ZONE：
-	//   created_at 為 timestamptz，AT TIME ZONE $3 會轉成 tz 的 local timestamp
-	//   to_char 產生該時區下的 YYYY-MM-DD，供呼叫端分桶
-	// 過濾條件：
-	//   當地日 >= sinceDate 且 < (untilDate + 1 day)
+	// 驗證 tz 為合法 IANA 時區，避免把 Postgres 錯誤訊息洩漏到上層
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return nil, model.NewAppError(400, model.ErrCodeInvalidInput, "無效的時區")
+	}
+
+	// 解析 since / until 為該時區下的當地日期
+	sinceLocal, err := time.ParseInLocation("2006-01-02", sinceDate, loc)
+	if err != nil {
+		return nil, model.NewAppError(400, model.ErrCodeInvalidInput, "無效的 since 日期格式，需 YYYY-MM-DD")
+	}
+	untilLocal, err := time.ParseInLocation("2006-01-02", untilDate, loc)
+	if err != nil {
+		return nil, model.NewAppError(400, model.ErrCodeInvalidInput, "無效的 until 日期格式，需 YYYY-MM-DD")
+	}
+
+	// 換算成 UTC 的 [startUTC, endUTC) 絕對時間戳範圍
+	//   startUTC = since 00:00:00 @tz → UTC
+	//   endUTC   = (until + 1 天) 00:00:00 @tz → UTC（exclusive upper bound）
+	startUTC := sinceLocal.UTC()
+	endUTC := untilLocal.AddDate(0, 0, 1).UTC()
+
+	// WHERE 以 created_at 絕對 timestamptz 範圍過濾（命中 idx_entries_created_at）。
+	// SELECT list 的 to_char(AT TIME ZONE $3) 僅用來產出分桶日期字串，不影響 index。
 	const query = `
 		SELECT id, title, summary, source_type, tags, created_at,
 		       to_char(created_at AT TIME ZONE $3, 'YYYY-MM-DD') AS local_date
 		FROM entries
 		WHERE is_archived = false
-		  AND (created_at AT TIME ZONE $3) >= ($1::date)::timestamp
-		  AND (created_at AT TIME ZONE $3) <  (($2::date + 1))::timestamp
+		  AND created_at >= $1
+		  AND created_at <  $2
 		ORDER BY created_at ASC
 	`
 
-	rows, err := r.pool.Query(ctx, query, sinceDate, untilDate, tz)
+	rows, err := r.pool.Query(ctx, query, startUTC, endUTC, tz)
 	if err != nil {
 		return nil, fmt.Errorf("entries.list_by_date_range query: %w", err)
 	}
@@ -511,6 +538,8 @@ func (r *EntryRepository) ListByDateRange(
 		"since", sinceDate,
 		"until", untilDate,
 		"tz", tz,
+		"start_utc", startUTC.Format(time.RFC3339),
+		"end_utc", endUTC.Format(time.RFC3339),
 	)
 	return items, nil
 }
