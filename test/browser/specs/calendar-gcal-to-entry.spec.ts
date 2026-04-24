@@ -1,93 +1,171 @@
 /**
  * F-026c / F-027c — Gcal event 轉 entry（成功 / 409 / 502 / linked_entry_id 顯示）
  *
- * 對應 issue：#85（Wave 0 skeleton）
- * 對應 spec：
- *   - specs/features/f026-calendar-view.md §POST /events/:gcal_id/to-entry
- *   - specs/features/f027-calendar-frontend.md §Scenario: 從事件轉為 entry
- *
- * 狀態：Wave 0 — 所有 test 先 skip。
+ * 對應 issue：#85（Wave 3 完整 assertion）
  */
 
 import { test, expect } from "@playwright/test";
-import { CALENDAR_TESTIDS as T } from "../fixtures/calendar";
+import { ApiClient } from "../helpers/api-client";
+import { setupAuth } from "../helpers/auth";
+import {
+  CALENDAR_TESTIDS as T,
+  DEFAULT_TEST_TIMEZONE,
+  installCalendarMock,
+  makeMockDay,
+  emptyMonthGrid,
+} from "../fixtures/calendar";
+
+test.use({ timezoneId: DEFAULT_TEST_TIMEZONE });
+
+const TARGET = "2026-04-24";
+
+function daySetupWithEvents(events: Array<{
+  gcal_id: string;
+  summary: string;
+  linked_entry_id?: string | null;
+}>) {
+  const fullEvents = events.map((e) => ({
+    gcal_id: e.gcal_id,
+    summary: e.summary,
+    start: `${TARGET}T09:00:00+08:00`,
+    end: `${TARGET}T10:00:00+08:00`,
+    linked_entry_id: e.linked_entry_id ?? null,
+  }));
+  const day = makeMockDay(TARGET, {
+    entries: [{ id: "pre-entry", title: "pre-existing" }],
+    events: fullEvents,
+  });
+  const days = emptyMonthGrid(TARGET).map((d) => (d.date === TARGET ? day : d));
+  return { days, dayDetails: { [TARGET]: day } };
+}
 
 test.describe("Calendar — Gcal event → Entry（F-026c + F-027c）", () => {
-  test("Scenario: 成功轉換 — toast + event 卡片變「查看 entry」+ 條目列表多一筆", async ({
-    page,
-  }) => {
-    test.skip(true, "Wave 3 — 等 feature 完成再啟用");
-
-    // GIVEN Sheet 開啟，顯示 gcal event「Standup」未關聯
-    // WHEN 點該 event 卡片的「轉成 entry」
-    // THEN
-    //   - 呼叫 POST /api/v1/calendar/events/:gcal_id/to-entry，回 201
-    //   - toast 顯示「已轉為知識條目」
-    //   - 該 event 卡片變成「查看 entry #N」連結（linked_entry_id 顯示）
-    //   - Sheet 條目 section 多一筆新 entry（query 重新 fetch）
-    await page.goto("/calendar?view=month&date=2026-04-24");
-    const eventCard = page.getByTestId(T.eventCard).first();
-    await eventCard.getByTestId(T.eventToEntryButton).click();
-
-    await expect(page.getByText(/已轉為知識條目/)).toBeVisible();
-    await expect(eventCard.getByTestId(T.eventLinkedEntryLink)).toBeVisible();
+  test.beforeEach(async ({ page, request }) => {
+    const { key } = await ApiClient.bootstrap(request, `qa08-convert-${Date.now()}`);
+    await page.goto("/");
+    await setupAuth(page, key);
   });
 
-  test("Scenario: 重複轉（409 ALREADY_LINKED）顯示「已轉過」toast", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 feature 完成再啟用");
+  test("Scenario: 成功轉換（201）→ toast 「已轉為知識條目」", async ({ page }) => {
+    const { days, dayDetails } = daySetupWithEvents([
+      { gcal_id: "ev-convert-1", summary: "Standup" },
+    ]);
 
-    // GIVEN event 已被轉過一次
-    // WHEN 再次點「轉成 entry」（可能並發或使用者重複點）
-    // THEN
-    //   - 後端回 409 ALREADY_LINKED
-    //   - toast 顯示「已轉過」
-    //   - React Query invalidate，卡片刷新為「查看 entry #N」
-    await page.goto("/calendar?view=month&date=2026-04-24");
-    const eventCard = page.getByTestId(T.eventCard).first();
+    await installCalendarMock(page, {
+      days,
+      dayDetails,
+      convert: {
+        status: 201,
+        body: { id: "new-entry-id", source_ref: "ev-convert-1" },
+      },
+    });
+
+    await page.goto(`/calendar?view=month&date=${TARGET}&sheet=${TARGET}`);
+    const sheet = page.getByTestId(T.sheet);
+    await expect(sheet).toBeVisible();
+
+    const eventCard = sheet.getByTestId(T.eventCard).first();
     await eventCard.getByTestId(T.eventToEntryButton).click();
 
-    await expect(page.getByText(/已轉過/)).toBeVisible();
-    await expect(eventCard.getByTestId(T.eventLinkedEntryLink)).toBeVisible();
+    // sonner toast 訊息可見
+    await expect(page.getByText(/已轉為知識條目/)).toBeVisible({ timeout: 5000 });
+  });
+
+  test("Scenario: 重複轉（409 ALREADY_LINKED）顯示「已轉過」info toast", async ({ page }) => {
+    const { days, dayDetails } = daySetupWithEvents([
+      { gcal_id: "ev-dup", summary: "Already linked" },
+    ]);
+
+    await installCalendarMock(page, {
+      days,
+      dayDetails,
+      convert: {
+        status: 409,
+        body: { code: "ALREADY_LINKED", existing_entry_id: "existing-123" },
+      },
+    });
+
+    await page.goto(`/calendar?view=month&date=${TARGET}&sheet=${TARGET}`);
+    const sheet = page.getByTestId(T.sheet);
+    await expect(sheet).toBeVisible();
+
+    await sheet
+      .getByTestId(T.eventCard)
+      .first()
+      .getByTestId(T.eventToEntryButton)
+      .click();
+
+    // message: "此事件已轉過，重新整理中…"
+    await expect(page.getByText(/已轉過/)).toBeVisible({ timeout: 5000 });
   });
 
   test("Scenario: Gcal 上游失敗（502 GCAL_UPSTREAM_ERROR）顯示錯誤 toast", async ({
     page,
   }) => {
-    test.skip(true, "Wave 3 — 等 feature 完成再啟用");
+    const { days, dayDetails } = daySetupWithEvents([
+      { gcal_id: "ev-502", summary: "Upstream fail" },
+    ]);
 
-    // GIVEN gcal mock 設為 500（導致後端回 502）
-    // WHEN 點「轉成 entry」
-    // THEN toast 顯示失敗訊息，event 卡片狀態不變
-    await page.goto("/calendar?view=month&date=2026-04-24");
-    const eventCard = page.getByTestId(T.eventCard).first();
-    await eventCard.getByTestId(T.eventToEntryButton).click();
+    await installCalendarMock(page, {
+      days,
+      dayDetails,
+      convert: {
+        status: 502,
+        body: { code: "GCAL_UPSTREAM_ERROR" },
+      },
+    });
 
-    await expect(page.getByText(/無法轉換|失敗|上游/)).toBeVisible();
+    await page.goto(`/calendar?view=month&date=${TARGET}&sheet=${TARGET}`);
+    const sheet = page.getByTestId(T.sheet);
+    await expect(sheet).toBeVisible();
+
+    await sheet
+      .getByTestId(T.eventCard)
+      .first()
+      .getByTestId(T.eventToEntryButton)
+      .click();
+
+    // message: "Google Calendar 暫時無法存取，請稍後再試"
+    await expect(page.getByText(/暫時無法存取|稍後再試|Google Calendar/)).toBeVisible({
+      timeout: 5000,
+    });
   });
 
-  test("Scenario: 預先已 linked 的 event 直接顯示「查看 entry」不顯示轉換按鈕", async ({
+  test("Scenario: 預先 linked event 直接顯示「檢視」連結，無「轉成條目」按鈕", async ({
     page,
   }) => {
-    test.skip(true, "Wave 3 — 等 feature 完成再啟用");
+    const { days, dayDetails } = daySetupWithEvents([
+      {
+        gcal_id: "ev-linked",
+        summary: "Already linked event",
+        linked_entry_id: "linked-entry-1",
+      },
+    ]);
 
-    // GIVEN /calendar/days API 回傳的 events[].linked_entry_id != null
-    // WHEN 開啟 Sheet
-    // THEN 該 event 卡片僅顯示「查看 entry #N」連結，無「轉成 entry」按鈕
-    await page.goto("/calendar?view=month&date=2026-04-24");
-    const linkedCard = page.getByTestId(T.eventCard).first();
-    await expect(linkedCard.getByTestId(T.eventLinkedEntryLink)).toBeVisible();
-    await expect(linkedCard.getByTestId(T.eventToEntryButton)).toHaveCount(0);
+    await installCalendarMock(page, { days, dayDetails });
+
+    await page.goto(`/calendar?view=month&date=${TARGET}&sheet=${TARGET}`);
+    const sheet = page.getByTestId(T.sheet);
+    await expect(sheet).toBeVisible();
+
+    const card = sheet.getByTestId(T.eventCard).first();
+    await expect(card.getByTestId(T.eventLinkedEntryLink)).toBeVisible();
+    await expect(card.getByTestId(T.eventToEntryButton)).toHaveCount(0);
   });
 
-  test("Scenario: 點「查看 entry」跳轉到該 entry 詳情頁", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 feature 完成再啟用");
+  test("Scenario: 點「檢視」連結跳到 entry 詳情頁", async ({ page }) => {
+    const { days, dayDetails } = daySetupWithEvents([
+      {
+        gcal_id: "ev-linked-nav",
+        summary: "Linked for nav",
+        linked_entry_id: "nav-entry-1",
+      },
+    ]);
+    await installCalendarMock(page, { days, dayDetails });
 
-    // GIVEN event 卡片已 linked
-    // WHEN 點「查看 entry #N」
-    // THEN 導航到 /entries/<entry_id>
-    await page.goto("/calendar?view=month&date=2026-04-24");
-    const linkedCard = page.getByTestId(T.eventCard).first();
-    await linkedCard.getByTestId(T.eventLinkedEntryLink).click();
-    await expect(page).toHaveURL(/\/entries\/[0-9a-f-]+/);
+    await page.goto(`/calendar?view=month&date=${TARGET}&sheet=${TARGET}`);
+    const sheet = page.getByTestId(T.sheet);
+    const link = sheet.getByTestId(T.eventLinkedEntryLink).first();
+    await expect(link).toHaveAttribute("href", /\/entries\/nav-entry-1/);
   });
 });
