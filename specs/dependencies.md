@@ -619,3 +619,98 @@ F-023 工作量最大（列表 + 詳情 + 編輯 + Markdown），預期為 Wave 
 | Next.js App Router + TanStack Query hydration | SSR 錯誤 | 查詢以 "use client" component 觸發 |
 | Docker compose frontend depends on api | 啟動失敗 | 使用 depends_on + healthcheck，client-side fetch 重試 |
 | F-023 Markdown 渲染 XSS | 安全風險 | 使用 react-markdown（預設禁 raw HTML）+ 不用 dangerouslySetInnerHTML |
+
+---
+
+## Sprint 8：行事曆基礎
+
+### 依賴來源
+- 沿用 Sprint 3 F-009（Google Calendar OAuth + token refresh）的 `GcalService` / `GcalIntegrationRepository`
+- 沿用 Sprint 7 前端 foundation（`ApiClient`、TanStack Query provider、`app-sidebar`、shadcn/ui 元件庫）
+- 沿用 `EntryRepository`（新增 `ListByDateRange`）與 `entries.source_type='gcal' + source_ref=event.id` 關聯慣例
+
+### Feature 拆分（Sprint 8）
+
+Backend（F-026 拆三）：
+- **F-026a**：Migration 012 + `EntryRepository.ListByDateRange` + `dto/calendar.go`（共用型別）
+- **F-026b**：`GET /api/v1/calendar` + `GET /api/v1/calendar/days/:date`（含 tz / degraded / cache）
+- **F-026c**：`POST /api/v1/calendar/events/:gcal_id/to-entry`（event → entry 轉換）
+
+Frontend（F-027 拆三）：
+- **F-027a**：`/calendar` 路由 + `CalendarPage` 容器 + `CalendarToolbar` + 月視圖 + sidebar 新增項
+- **F-027b**：週視圖 + 日視圖 + 鍵盤快捷鍵 + 手機版 fallback
+- **F-027c**：`DayDetailSheet`（Sheet + entry list + event list + 轉 entry 按鈕）+ banner / toast
+
+設計（D-08）：
+- Calendar grid / DayCell / EventChip / EntryBadge / DayDetailSheet mocks + tokens
+
+QA（QA-08）：
+- Playwright e2e 對應全部 scenarios + backend API 整合測試
+
+### 依賴圖（Sprint 8）
+
+```
+D-08 (UI Design)  ┐
+                  ├─── F-027a (CalendarPage + MonthView + sidebar)
+F-026a (migration + repo + DTO)                          │
+  ├── F-026b (GET /calendar, /calendar/days/:date) ─────┤
+  │     │                                                │
+  │     └──► F-027a / F-027b / F-027c 依賴之             │
+  └── F-026c (POST .../to-entry) ───────► F-027c
+                                           │
+QA-08 (test skeleton，Wave 0 起跑) ◄──── 全部 feature merge 後再補完整 e2e
+```
+
+### 拓撲排序 / Wave
+
+**Wave 0（並行起跑）**
+- **F-026a**：migration + repo + DTO 型別（純後端，無依賴）
+- **D-08**：UI Design（純設計，無依賴）
+- **QA-08**：建立 Playwright 測試骨架、撰寫 e2e scenario 清單（不需等 feature 完成）
+
+**Wave 1（Wave 0 完成後）**
+- **F-026b**：彙整 API（依賴 F-026a 的 repo + DTO）
+- **F-026c**：event → entry（依賴 F-026a 的 `uq_entries_gcal_ref` unique index）
+- **F-027a**：月視圖 + 路由 + sidebar（依賴 F-026b 的 API + D-08 的 tokens）
+
+**Wave 2（Wave 1 完成後）**
+- **F-027b**：週視圖 + 日視圖（依賴 F-027a 的 CalendarPage 容器 + toolbar）
+- **F-027c**：DayDetailSheet + 轉 entry 動作（依賴 F-026b 的 `/days/:date` + F-026c 的 POST）
+
+**Wave 3**
+- QA-08 補齊完整 e2e 並執行 docker compose 完整測試
+
+### 並行策略
+
+```
+時間線 ->
+
+Wave 0:  [F-026a migration + repo + DTO ────]
+         [D-08  UI Design tokens + mocks ────]
+         [QA-08 test skeleton ──────────────────────────────────]
+
+Wave 1:                   [F-026b /calendar GET ────────]
+                          [F-026c /to-entry POST ───]
+                          [F-027a CalendarPage + MonthView ─────]
+
+Wave 2:                                         [F-027b Week + Day ─────]
+                                                [F-027c DayDetailSheet ──]
+
+Wave 3:                                                            [QA-08 完整 e2e ──]
+
+Code Review:  [逐 PR 審查 ─────────────────────────────────────────────────────]
+```
+
+### 關鍵路徑
+
+F-026a → F-026b → F-027a → F-027c → QA-08 完整 e2e
+
+### 風險項目（Sprint 8）
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| 自幹 calendar grid 時間軸計算 bug（週/日視圖跨日 event） | UX 錯位 | 先寫 util 純函式 + 單測，再畫 UI |
+| Timezone 分桶錯誤 | entry 歸錯日 | 後端 `X-Timezone` header；單測覆蓋 Asia/Taipei 跨日 scenario |
+| Gcal upstream 不穩 | 整頁失敗 | Degraded response（HTTP 200 + `X-Degraded: gcal`） |
+| Migration 012 unique index 與既有 gcal entries 衝突 | migration 失敗 | up.sql 前置 cleanup query 保留最早一筆 |
+| 使用者尚未連 gcal 每次 424 | 首次體驗差 | 前端以 `include_gcal=false` 預查一次、後端 422 改用 200 + `gcal_connected=false` flag（保留 424 給明確要 include_gcal=true 時） |

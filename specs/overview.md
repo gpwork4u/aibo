@@ -58,6 +58,13 @@
 | F-018 | Service Interface 化 | Sprint 6 | P0 | `specs/features/f018-service-interfaces.md` |
 | F-019 | 品質檢測（VIBE 簡化版） | Sprint 6 | P1 | `specs/features/f019-quality-check.md` |
 | F-020 | 小項修復 | Sprint 6 | P1 | `specs/features/f020-misc-fixes.md` |
+| F-026 | 行事曆彙整 API | Sprint 8 | P0 | `specs/features/f026-calendar-view.md` |
+| F-027 | 行事曆前端頁面 | Sprint 8 | P0 | `specs/features/f027-calendar-frontend.md` |
+| F-028 | 每日日記（後端） | Sprint 9 | P0 | `specs/features/f028-daily-journal.md` |
+| F-029 | 日記前端頁面 | Sprint 9 | P0 | `specs/features/f029-journal-frontend.md` |
+| F-030 | Google Calendar 整合強化 | Sprint 9 | P1 | `specs/features/f030-gcal-enhancements.md` |
+| F-031 | 專案與任務管理（後端） | Sprint 10 | P0 | `specs/features/f031-projects-tasks.md` |
+| F-032 | 專案管理前端頁面 | Sprint 10 | P0 | `specs/features/f032-projects-frontend.md` |
 
 ## Sprint 規劃
 
@@ -91,6 +98,19 @@
 - F-018 Service Interface 化
 - F-019 品質檢測（VIBE 簡化版）
 - F-020 小項修復
+
+### Sprint 8：行事曆基礎
+- F-026 行事曆彙整 API（read-through gcal + entries）
+- F-027 行事曆前端頁面（月/週/日 + Day Sheet）
+
+### Sprint 9：日記 + Google Calendar 強化
+- F-028 每日日記（後端含 LLM draft）
+- F-029 日記前端頁面
+- F-030 Google Calendar 整合強化（status / calendars / events API / 設定頁）
+
+### Sprint 10：專案管理
+- F-031 專案與任務管理（後端，含 Project / Task / refs）
+- F-032 專案管理前端頁面（Kanban + List + RefsPicker）
 
 ## 非功能需求
 

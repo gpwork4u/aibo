@@ -1458,3 +1458,104 @@ dev/frontend/
 | Next.js 14 App Router 與 TanStack Query hydration | SSR 錯誤 | 使用 HydrationBoundary、查詢以 "use client" 組件觸發 |
 | 後端 CORS 設定缺失 | 前端無法呼叫 API | Gin 加 CORS middleware，允許 localhost:3000 |
 | Docker multi-service 啟動順序 | frontend 先於 api 啟動失敗 | docker-compose depends_on + Next.js client-side fetch 重試 |
+
+---
+
+## Sprint 8：行事曆基礎
+
+### 調查日期
+2026-04-24
+
+### 需求摘要
+- 月 / 週 / 日三種檢視（F-027）
+- 後端彙整 API：entries + gcal events read-through（F-026）
+- 點擊日格 → 右側 Sheet（shadcn）
+- 行事曆元件需能與 Tailwind 3 + shadcn/ui 搭配、不拖累 bundle、支援 a11y
+
+### 1. React 行事曆元件選型
+
+| 方案 | 版本 | Bundle (gzip) | shadcn/Tailwind 契合度 | a11y | 客製自由度 | 備註 |
+|------|------|-------------|------------------------|------|-----------|------|
+| `@fullcalendar/react` | 6.x | core ~14KB + 每個插件 10-40KB（dayGrid + timeGrid + interaction 合計約 60-80KB gzip） | 低：自帶 CSS、class naming 難覆蓋 | 佳 | 中，需寫 CSS override | 功能最豐富但「重」，且要額外買 premium 拿 resource timeline |
+| `react-big-calendar` | 1.x | ~45KB gzip（含 moment/date-fns localizer） | 中：SCSS 可覆蓋，但要手動套 Tailwind | 中 | 高（React-native） | 需帶 localizer（date-fns localizer 較省），樣式要花功夫 |
+| `@schedule-x/react` | 2.x | ~30KB gzip（plugins 另計） | 中：有自己的 theme tokens | 宣稱支援 | 中 | 社群較新、生態小 |
+| **自幹 grid + date-fns** | — | ~5-8KB（僅 date-fns tree-shaken + 自寫元件） | **最高** | 自控（必須自己實作 gridcell/aria） | 最高 | 月視圖即 6×7 grid，相對單純；週/日視圖需時間軸渲染 |
+
+**決策：採「自幹 + date-fns」** 作為 F-027 實作主線。
+**理由**：
+1. 視覺需求聚焦「顯示數量 badge + 最多 2 個 event title + 日記 icon」，並非拖拽排程——不需要 FullCalendar / react-big-calendar 的 drag-drop / resize 重型能力。
+2. 現有 UI 以 shadcn/ui + Tailwind 3 為主，自幹 grid 能一次對齊 design tokens，不用 shadow DOM / CSS 覆寫戰。
+3. Bundle size 比引入任一 lib 都小一個數量級，符合個人工具「啟動快」的定位。
+4. a11y（`role="gridcell"` + `aria-label`）與鍵盤快捷鍵（左右方向鍵、M/W/D 切換 view）在 spec 已明列，自幹可精確控制。
+5. 未來若需要進階排程（Sprint 10 專案 Gantt），屆時再評估 FullCalendar premium 不遲。
+
+**風險與緩解**：
+- 風險：週/日視圖時間軸（06:00-24:00）計算與跨日 event 切片較繁瑣。
+- 緩解：先把 `getWeekEvents(day)` / `eventsCoveringDay(events, day)` 寫成純函式並單測，視圖層純渲染。
+
+### 2. 日期處理 library
+
+| 候選 | Bundle | 既有專案狀態 |
+|------|--------|-------------|
+| `date-fns` | tree-shakable（單一 function < 1KB） | **Sprint 7 已列入** tech-survey §41（待引入） |
+| `dayjs` | 2KB 但需手動 load plugin 處理 IANA timezone | — |
+| `luxon` | 23KB，timezone 支援最完整 | — |
+
+**決策：引入 `date-fns` + `date-fns-tz`**。
+- `date-fns` 處理 week start / month grid / format。
+- `date-fns-tz` 處理使用者 `X-Timezone`（如 `Asia/Taipei`）時的日期邊界（F-026 Scenario: 不同時區下的日期歸屬）。
+- 既有 frontend package.json 尚未安裝，F-027 PR 需新增依賴。
+
+### 3. Google Calendar 讀取策略
+
+| 項目 | 策略 |
+|------|------|
+| API | `calendar.v3.Events.List`（既有 `dev/src/service/gcal.go:230` 已使用） |
+| 參數 | `TimeMin=since`、`TimeMax=until`（RFC3339 + TZ offset）、`SingleEvents=true`（展開 recurring）、`OrderBy=startTime`、`MaxResults=250` |
+| Pagination | 單次 `until-since` 最多 92 天（spec 限制），250 結果通常足夠；若 `NextPageToken` 非空則迴圈抓取到空 |
+| Timeout | Context 帶 8s timeout；超時視為 upstream 錯誤 |
+| Degraded | 上游非 200 或 timeout → 回應 `X-Degraded: gcal`、`events: []`，HTTP 仍為 200（非 `include_gcal` 必需時） |
+| Cache | Server 端 5 分鐘 in-memory（key = `email + calendarId + since + until`）用 sync.Map + TTL；降低重複 API quota |
+| Token refresh | 沿用既有 `TokenSource` 自動 refresh + `gcalRepo.UpdateTokens`（見 `service/gcal.go:203`） |
+| Rate limit | Google Calendar quota：1M queries/day per project、600 queries/min per user；單使用者工具遠低於此，不實作 backoff（upstream error 直接 degraded） |
+
+**實作重點**：
+- 新增 `service.GcalService.ListEvents(ctx, calendarID, since, until) ([]*calendar.Event, error)`，將 `ImportEvents` 中的 list 邏輯抽出共用。
+- `CalendarService.Aggregate(ctx, req)` 組合 `entryRepo.ListByDateRange` + `gcalSvc.ListEvents`，在同一層組出 `days[]` 結構。
+
+### 4. Backend API 端點與 query 設計
+
+沿用 spec（f026-calendar-view.md）；補充慣例：
+- 所有端點放在 `v1.Group("/calendar")`，middleware 同既有 `/api/v1/*` 走 API Key auth。
+- `X-Timezone` header 解析失敗 → 回 400 `INVALID_INPUT`。
+- 新增 DTO：`dto/calendar.go` 放 `CalendarResponse` / `CalendarDay` / `CalendarEntry` / `CalendarEvent`。
+- Repo：`EntryRepository.ListByDateRange(ctx, sinceDate, untilDate, tz string) ([]CalendarEntry, error)`，於 SQL 使用 `created_at AT TIME ZONE $3` 算當地日，join migration 012 的 `idx_entries_created_at_date`（對 UTC 日適用；若帶 tz，用 `((created_at AT TIME ZONE 'UTC') AT TIME ZONE $tz)::date` 需要 full scan + date bucketing，暫以 between `created_at >= since_utc AND created_at < until_utc+1d` 粗篩後 in-memory 分桶）。
+- Migration 012：見 spec `Data Model` 段。
+
+### 5. Frontend 新增依賴
+
+| Package | 版本 | 用途 |
+|---------|------|------|
+| `date-fns` | ^3 | 日期計算 |
+| `date-fns-tz` | ^3 | IANA timezone |
+| `@radix-ui/react-tabs` | ^1.1 | toolbar 月/週/日 Tabs（尚未安裝但與既有 radix 生態一致） |
+| **Sheet 元件** | — | shadcn/ui `Sheet`（基於 `@radix-ui/react-dialog`，已安裝）—走 shadcn CLI 新增 `sheet.tsx` |
+
+### 6. 風險與緩解（Sprint 8）
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| 自幹 grid 在 week/day 視圖時間軸計算 bug | 顯示錯位 | 核心 util function 全量單測；視圖層純渲染 |
+| timezone 分桶錯誤（UTC vs Asia/Taipei） | entry 歸錯日 | 後端以 `X-Timezone` 決定；單測覆蓋跨日 case（F-026 edge scenario） |
+| Gcal 上游不穩導致整個頁面失敗 | UX 壞 | degraded response 固定回 200 + `X-Degraded`，前端 toast 提示 |
+| 首次進 `/calendar` 使用者未連 gcal → 424 洪水 | 體驗差 | 前端先讀 `/api/v1/integrations/gcal/status`（F-030 會補，此 sprint 用 localStorage cache `gcal_connected` bool；無時請求帶 `include_gcal=false`） |
+| Migration 012 `uq_entries_gcal_ref` 若既有資料有重複 gcal entry 衝突 | migration 失敗 | migration 前先跑 cleanup query（同 up.sql），deduplicate 保留最早一筆 |
+
+### 7. 參考資料
+- [schedule-x GitHub — modern alternative to fullcalendar](https://github.com/schedule-x/schedule-x)
+- [FullCalendar React docs](https://fullcalendar.io/docs/react)
+- [react-big-calendar npm](https://www.npmjs.com/package/react-big-calendar)
+- [npm-compare: react-big-calendar vs fullcalendar](https://npm-compare.com/@fullcalendar/react,react-big-calendar,react-calendar,react-datepicker)
+- [Google Calendar Events: list](https://developers.google.com/workspace/calendar/api/v3/reference/events/list)
+- [Avoid Calendar API limits](https://support.google.com/a/answer/2905486)
+- [date-fns-tz](https://github.com/marnusw/date-fns-tz)
