@@ -27,7 +27,7 @@ export interface CreateApiKeyResponse extends ApiKey {
 }
 
 export async function listApiKeys(): Promise<ApiKey[]> {
-  const res = await apiClient.get<ApiKeyListResponse | ApiKey[]>("/api/v1/api-keys");
+  const res = await apiClient.get<ApiKeyListResponse | ApiKey[]>("/api/v1/auth/api-keys");
   if (Array.isArray(res)) return res;
   return res.data ?? [];
 }
@@ -35,9 +35,9 @@ export async function listApiKeys(): Promise<ApiKey[]> {
 export async function createApiKey(
   payload: CreateApiKeyPayload,
 ): Promise<CreateApiKeyResponse> {
-  return apiClient.post<CreateApiKeyResponse>("/api/v1/api-keys", payload);
+  return apiClient.post<CreateApiKeyResponse>("/api/v1/auth/api-keys", payload);
 }
 
 export async function revokeApiKey(id: string): Promise<void> {
-  await apiClient.delete(`/api/v1/api-keys/${encodeURIComponent(id)}`);
+  await apiClient.delete(`/api/v1/auth/api-keys/${encodeURIComponent(id)}`);
 }
