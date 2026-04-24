@@ -83,7 +83,7 @@ func (s *CalendarConvertService) ConvertEventToEntry(
 	sourceType := "gcal"
 	sourceRef := event.Id
 	source := calendarID
-	tags := []string{"gcal", "meeting"}
+	tags := []string{"gcal"}
 
 	now := time.Now()
 	entry := &model.Entry{
