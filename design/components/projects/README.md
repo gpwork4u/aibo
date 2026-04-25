@@ -10,7 +10,18 @@
 | ProjectFormDialog | `project-form-dialog.md` | 新增 / 編輯 Project Dialog |
 | ProjectOverviewTab | `project-overview-tab.md` | `/projects/:id` Overview tab 內容 |
 | ProjectStatusTabs | （內含於 list-page mock） | 列表頁 active / paused / done / archived 切換 |
-| DeleteProjectConfirmDialog | （內含於 form-dialog 末尾） | 二次確認刪除（顯示 task 數） |
+| DeleteProjectConfirmDialog | `delete-project-confirm-dialog.md` | 二次確認刪除（顯示 task 數 + force=true checkbox） |
+| RefsPicker | `refs-picker.md` | TaskSheet 內 entry/journal/gcal_event 三 tab refs 選擇器（含「來源已刪除」標記態） |
+| UpcomingTasksWidget | `upcoming-tasks-widget.md` | Sidebar 底部「近期 tasks」widget（`/tasks/upcoming?days=7`，最多 5 筆，過期紅標） |
+
+## 頁面靜態 mock
+
+`design/pages/projects/` 目錄下提供 4 份 HTML mock，所有 testid 與 `testids.md` 一致：
+
+- `projects-list.html`
+- `project-detail-board.html`
+- `project-detail-list.html`
+- `project-detail-overview.html`
 
 ## testid 規範
 

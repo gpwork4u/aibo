@@ -53,9 +53,39 @@ export const PROJECTS_TESTIDS = {
 
   // Delete Confirm Dialog
   deleteDialog: "project-delete-dialog",
+  deleteDialogTitle: "project-delete-dialog-title",
+  deleteDialogTaskWarning: "project-delete-dialog-task-warning",
   deleteDialogTaskCount: "project-delete-dialog-task-count",
+  deleteDialogForceCheckbox: "project-delete-dialog-force-checkbox",
   deleteDialogConfirm: "project-delete-dialog-confirm",
   deleteDialogCancel: "project-delete-dialog-cancel",
+  deleteDialogError: "project-delete-dialog-error",
+
+  // Refs Picker（TaskSheet 內）
+  refsPicker: "projects-refs-picker",
+  refsPickerTabs: "projects-refs-picker-tabs",
+  refsPickerTab: "projects-refs-picker-tab",                  // suffix -{type}
+  refsPickerSearch: "projects-refs-picker-search",
+  refsPickerResults: "projects-refs-picker-results",
+  refsPickerResultItem: "projects-refs-picker-result",        // suffix -{refId}
+  refsPickerEmpty: "projects-refs-picker-empty",
+  refsPickerSelected: "projects-refs-picker-selected",
+  refsPickerSelectedEmpty: "projects-refs-picker-selected-empty",
+  refsPickerChip: "projects-refs-picker-chip",                // suffix -{refId}
+  refsPickerChipRemove: "projects-refs-picker-chip-remove",   // suffix -{refId}
+  refsPickerChipMissing: "projects-refs-picker-chip-missing",
+
+  // Sidebar Upcoming Tasks Widget
+  upcomingWidget: "projects-upcoming-widget",
+  upcomingWidgetCount: "projects-upcoming-count",
+  upcomingWidgetRefresh: "projects-upcoming-refresh",
+  upcomingWidgetSkeleton: "projects-upcoming-skeleton",
+  upcomingWidgetError: "projects-upcoming-error",
+  upcomingWidgetEmpty: "projects-upcoming-empty",
+  upcomingWidgetCreateCta: "projects-upcoming-create-cta",
+  upcomingWidgetItem: "projects-upcoming-item",                  // suffix -{taskId}
+  upcomingWidgetItemTitle: "projects-upcoming-item-title",       // suffix -{taskId}
+  upcomingWidgetItemDue: "projects-upcoming-item-due",           // suffix -{taskId}
 
   // Detail page (container)
   detailPage: "project-detail-page",
