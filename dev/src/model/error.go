@@ -29,6 +29,8 @@ const (
 	ErrCodeInvalidStatusTransition = "INVALID_STATUS_TRANSITION"
 	ErrCodeProjectNotFound         = "PROJECT_NOT_FOUND"
 	ErrCodeTaskNotFound            = "TASK_NOT_FOUND"
+	ErrCodeProjectArchived         = "PROJECT_ARCHIVED"
+	ErrCodeInvalidRefType          = "INVALID_REF_TYPE"
 )
 
 // AppError 應用程式錯誤
