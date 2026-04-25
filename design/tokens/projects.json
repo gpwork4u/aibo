@@ -1,0 +1,136 @@
+{
+  "$comment": "Sprint 10 Projects / Tasks / Kanban 配色 tokens。語意 token，不直接寫死於元件樣式；統一以 CSS 變數 / Tailwind utility 引用。色彩皆通過 WCAG 2.1 AA（>= 4.5:1，文字搭配對應 -foreground）。色盲友善：每個語意都同時提供 emoji icon / 文字 label，顏色不作為唯一資訊載體。",
+  "priority": {
+    "low": {
+      "label": "低",
+      "icon": "ArrowDownIcon",
+      "bg": "hsl(240 4.8% 95.9%)",
+      "fg": "hsl(240 5% 30%)",
+      "border": "hsl(240 5.9% 80%)",
+      "ring": "hsl(240 5% 50%)"
+    },
+    "normal": {
+      "label": "一般",
+      "icon": "MinusIcon",
+      "bg": "hsl(217 91% 95%)",
+      "fg": "hsl(217 91% 30%)",
+      "border": "hsl(217 91% 75%)",
+      "ring": "hsl(217 91% 50%)"
+    },
+    "high": {
+      "label": "高",
+      "icon": "ArrowUpIcon",
+      "bg": "hsl(25 95% 94%)",
+      "fg": "hsl(25 95% 30%)",
+      "border": "hsl(25 95% 70%)",
+      "ring": "hsl(25 95% 50%)"
+    },
+    "urgent": {
+      "label": "急迫",
+      "icon": "FlameIcon",
+      "bg": "hsl(0 84% 95%)",
+      "fg": "hsl(0 84% 35%)",
+      "border": "hsl(0 84% 70%)",
+      "ring": "hsl(0 84% 55%)"
+    }
+  },
+  "task-status": {
+    "todo": {
+      "label": "待辦",
+      "icon": "CircleIcon",
+      "bg": "hsl(240 4.8% 95.9%)",
+      "fg": "hsl(240 5% 25%)",
+      "dot": "hsl(240 5% 60%)"
+    },
+    "in_progress": {
+      "label": "進行中",
+      "icon": "PlayCircleIcon",
+      "bg": "hsl(217 91% 95%)",
+      "fg": "hsl(217 91% 28%)",
+      "dot": "hsl(217 91% 50%)"
+    },
+    "blocked": {
+      "label": "卡住",
+      "icon": "AlertOctagonIcon",
+      "bg": "hsl(0 84% 95%)",
+      "fg": "hsl(0 84% 35%)",
+      "dot": "hsl(0 84% 55%)"
+    },
+    "done": {
+      "label": "完成",
+      "icon": "CheckCircle2Icon",
+      "bg": "hsl(142 60% 92%)",
+      "fg": "hsl(142 76% 25%)",
+      "dot": "hsl(142 76% 36%)"
+    },
+    "cancelled": {
+      "label": "已取消",
+      "icon": "XCircleIcon",
+      "bg": "hsl(240 4% 92%)",
+      "fg": "hsl(240 5% 45%)",
+      "dot": "hsl(240 5% 65%)"
+    }
+  },
+  "project-status": {
+    "active": {
+      "label": "進行中",
+      "icon": "ZapIcon",
+      "bg": "hsl(142 60% 92%)",
+      "fg": "hsl(142 76% 25%)",
+      "border": "hsl(142 60% 70%)"
+    },
+    "paused": {
+      "label": "暫停",
+      "icon": "PauseCircleIcon",
+      "bg": "hsl(38 92% 92%)",
+      "fg": "hsl(38 92% 28%)",
+      "border": "hsl(38 92% 70%)"
+    },
+    "done": {
+      "label": "已完成",
+      "icon": "CheckCircle2Icon",
+      "bg": "hsl(217 91% 94%)",
+      "fg": "hsl(217 91% 28%)",
+      "border": "hsl(217 91% 70%)"
+    },
+    "archived": {
+      "label": "封存",
+      "icon": "ArchiveIcon",
+      "bg": "hsl(240 4% 92%)",
+      "fg": "hsl(240 5% 40%)",
+      "border": "hsl(240 5% 70%)"
+    }
+  },
+  "kanban": {
+    "column-bg": "hsl(240 4.8% 97%)",
+    "column-bg-dark": "hsl(240 6% 12%)",
+    "column-header-fg": "hsl(240 5% 25%)",
+    "column-drag-over-bg": "hsl(217 91% 95%)",
+    "column-drag-over-bg-dark": "hsl(217 60% 18%)",
+    "column-drag-over-ring": "hsl(217 91% 60%)",
+    "card-bg": "hsl(0 0% 100%)",
+    "card-bg-dark": "hsl(240 6% 16%)",
+    "card-shadow-rest": "0 1px 2px 0 rgb(0 0 0 / 0.06)",
+    "card-shadow-hover": "0 2px 6px -1px rgb(0 0 0 / 0.10)",
+    "card-shadow-drag": "0 12px 24px -8px rgb(0 0 0 / 0.30), 0 0 0 2px hsl(217 91% 60% / 0.40)",
+    "card-rotate-drag": "2deg",
+    "drop-indicator": "hsl(217 91% 55%)",
+    "drag-handle-fg": "hsl(240 5% 55%)",
+    "drag-handle-hover-fg": "hsl(240 5% 25%)"
+  },
+  "project-color-palette": {
+    "$comment": "Project.color 預設色票，Project Dialog Color Picker 用；皆為 hex，與 DB 欄位一致。",
+    "blue":   "#3b82f6",
+    "violet": "#8b5cf6",
+    "pink":   "#ec4899",
+    "rose":   "#f43f5e",
+    "orange": "#f97316",
+    "amber":  "#f59e0b",
+    "lime":   "#84cc16",
+    "emerald":"#10b981",
+    "teal":   "#14b8a6",
+    "cyan":   "#06b6d4",
+    "slate":  "#64748b",
+    "zinc":   "#71717a"
+  }
+}
