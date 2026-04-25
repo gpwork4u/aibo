@@ -20,45 +20,116 @@ import type { Page, Route } from "@playwright/test";
 // data-testid 常數（與 engineer 對齊，見 F-032 spec）
 // ---------------------------------------------------------------------------
 
+/**
+ * 三邊對齊（F-033a）：
+ *   - source of truth：`design/components/projects/testids.md`
+ *   - frontend：`dev/frontend/lib/projects/testids.ts`
+ *   - 本檔（test fixtures）
+ *
+ * 為避免大規模改 e2e specs，本物件部分 key 名沿用 fixture 既有命名
+ * （例：`listEmptyCreateFirst`、`detailEditButton`），但 **value** 已對齊
+ * design 命名表，使 frontend `data-testid={...}` 能被 fixture 正確選取。
+ *
+ * 新撰寫 spec 時請優先使用「正規」key（如 `listEmptyCta`、`detailHeaderEdit`），
+ * deprecated alias 將於下一輪統一移除。
+ */
 export const PROJECTS_TESTIDS = {
   // ===== /projects 列表頁 =====
   listPage: "projects-list-page",
-  listEmpty: "projects-list-empty",
-  listEmptyCreateFirst: "projects-list-empty-create-first",
-  listCreateButton: "projects-list-create-button",
-  listStatusTabs: "projects-list-status-tabs",
-  /** 動態：`projects-list-status-tab-active` / `paused` / `done` / `archived` */
-  listStatusTab: (status: string) => `projects-list-status-tab-${status}`,
   listGrid: "projects-list-grid",
-  listCard: "projects-list-card",
-  /** 動態：`projects-list-card-{projectId}` */
-  listCardById: (id: string) => `projects-list-card-${id}`,
-  listCardName: "projects-list-card-name",
-  listCardColor: "projects-list-card-color",
-  listCardProgressBar: "projects-list-card-progress-bar",
-  listCardStatusBadge: "projects-list-card-status-badge",
-  listCardOpenTaskCount: "projects-list-card-open-task-count",
-  listCardNextDue: "projects-list-card-next-due",
+  listEmpty: "projects-list-empty",
+  /** 正規 key */
+  listEmptyCta: "projects-list-empty-cta",
+  /** @deprecated 改用 `listEmptyCta`（value 已對齊 design） */
+  listEmptyCreateFirst: "projects-list-empty-cta",
+  /** value 對齊 design：`projects-list-create`（不再帶 `-button` 後綴） */
+  listCreateButton: "projects-list-create",
+  listSkeleton: "projects-list-skeleton",
+  listError: "projects-list-error",
+
+  // ===== Status Tabs =====
+  /** 正規 key */
+  statusTabs: "projects-status-tabs",
+  /** @deprecated 改用 `statusTabs` */
+  listStatusTabs: "projects-status-tabs",
+  /** 正規 key（動態 suffix `-{status}`） */
+  statusTab: (status: string) => `projects-status-tab-${status}`,
+  /** @deprecated 改用 `statusTab` */
+  listStatusTab: (status: string) => `projects-status-tab-${status}`,
+
+  // ===== Project Card =====
+  /** 正規 key */
+  card: "project-card",
+  /** @deprecated 改用 `card` */
+  listCard: "project-card",
+  cardById: (id: string) => `project-card-${id}`,
+  /** @deprecated 改用 `cardById` */
+  listCardById: (id: string) => `project-card-${id}`,
+  cardName: "project-card-name",
+  /** @deprecated 改用 `cardName` */
+  listCardName: "project-card-name",
+  cardColorStripe: "project-card-color-stripe",
+  /** @deprecated 改用 `cardColorStripe` */
+  listCardColor: "project-card-color-stripe",
+  cardProgressBar: "project-card-progress-bar",
+  /** @deprecated 改用 `cardProgressBar` */
+  listCardProgressBar: "project-card-progress-bar",
+  cardProgressLabel: "project-card-progress-label",
+  cardStatusBadge: "project-card-status-badge",
+  /** @deprecated 改用 `cardStatusBadge` */
+  listCardStatusBadge: "project-card-status-badge",
+  cardOpenTaskCount: "project-card-open-task-count",
+  /** @deprecated 改用 `cardOpenTaskCount` */
+  listCardOpenTaskCount: "project-card-open-task-count",
+  cardNextDue: "project-card-next-due",
+  /** @deprecated 改用 `cardNextDue` */
+  listCardNextDue: "project-card-next-due",
 
   // ===== Project Dialog（建立 / 編輯）=====
   dialog: "project-dialog",
-  dialogNameInput: "project-dialog-name-input",
+  dialogTitle: "project-dialog-title",
+  /** value 對齊 design：`project-dialog-name`（不再帶 `-input` 後綴） */
+  dialogNameInput: "project-dialog-name",
   dialogNameError: "project-dialog-name-error",
-  dialogDescriptionInput: "project-dialog-description-input",
-  dialogColorInput: "project-dialog-color-input",
-  dialogStartDateInput: "project-dialog-start-date-input",
-  dialogEndDateInput: "project-dialog-end-date-input",
-  dialogSubmitButton: "project-dialog-submit-button",
-  dialogCancelButton: "project-dialog-cancel-button",
+  /** value 對齊 design：`project-dialog-description` */
+  dialogDescriptionInput: "project-dialog-description",
+  dialogColorPicker: "project-dialog-color-picker",
+  /** @deprecated 改用 `dialogColorPicker`（value 已對齊 design） */
+  dialogColorInput: "project-dialog-color-picker",
+  dialogColorSwatch: (key: string) => `project-dialog-color-swatch-${key}`,
+  /** value 對齊 design：`project-dialog-start-date` */
+  dialogStartDateInput: "project-dialog-start-date",
+  dialogStartDate: "project-dialog-start-date",
+  /** value 對齊 design：`project-dialog-end-date` */
+  dialogEndDateInput: "project-dialog-end-date",
+  dialogEndDate: "project-dialog-end-date",
+  dialogDateError: "project-dialog-date-error",
+  dialogStatusSelect: "project-dialog-status-select",
+  /** value 對齊 design：`project-dialog-submit` */
+  dialogSubmitButton: "project-dialog-submit",
+  dialogSubmit: "project-dialog-submit",
+  /** value 對齊 design：`project-dialog-cancel` */
+  dialogCancelButton: "project-dialog-cancel",
+  dialogCancel: "project-dialog-cancel",
 
   // ===== /projects/:id 詳情頁（Tabs 容器）=====
   detailPage: "project-detail-page",
   detailHeader: "project-detail-header",
   detailHeaderName: "project-detail-header-name",
   detailHeaderStatusBadge: "project-detail-header-status-badge",
-  detailEditButton: "project-detail-edit-button",
-  detailDeleteButton: "project-detail-delete-button",
-  detailArchiveButton: "project-detail-archive-button",
+  /** 正規 key */
+  detailHeaderEdit: "project-detail-header-edit",
+  /** @deprecated 改用 `detailHeaderEdit`（value 對齊 design） */
+  detailEditButton: "project-detail-header-edit",
+  /** 正規 key */
+  detailHeaderArchive: "project-detail-header-archive",
+  /** @deprecated 改用 `detailHeaderArchive` */
+  detailArchiveButton: "project-detail-header-archive",
+  /** 正規 key */
+  detailHeaderDelete: "project-detail-header-delete",
+  /** @deprecated 改用 `detailHeaderDelete` */
+  detailDeleteButton: "project-detail-header-delete",
+  detailNewTask: "project-detail-new-task",
   detailTabs: "project-detail-tabs",
   detailTabBoard: "project-detail-tab-board",
   detailTabList: "project-detail-tab-list",
@@ -66,24 +137,46 @@ export const PROJECTS_TESTIDS = {
 
   // ===== Overview Tab =====
   overviewPanel: "project-overview-panel",
-  overviewDescription: "project-overview-description",
+  overviewProgress: "project-overview-progress",
   overviewProgressBar: "project-overview-progress-bar",
   overviewProgressText: "project-overview-progress-text",
+  overviewDescription: "project-overview-description",
   overviewStartDate: "project-overview-start-date",
   overviewEndDate: "project-overview-end-date",
-  overviewRecentUpdates: "project-overview-recent-updates",
+  overviewDates: "project-overview-dates",
+  overviewActivity: "project-overview-activity",
+  /** @deprecated 改用 `overviewActivity` */
+  overviewRecentUpdates: "project-overview-activity",
 
   // ===== 刪除確認對話框 =====
   deleteDialog: "project-delete-dialog",
-  deleteDialogConfirmHasTasks: "project-delete-dialog-confirm-has-tasks",
-  deleteDialogConfirmButton: "project-delete-dialog-confirm-button",
-  deleteDialogCancelButton: "project-delete-dialog-cancel-button",
-  deleteDialogForceButton: "project-delete-dialog-force-button",
+  deleteDialogTitle: "project-delete-dialog-title",
+  deleteDialogTaskWarning: "project-delete-dialog-task-warning",
+  deleteDialogTaskCount: "project-delete-dialog-task-count",
+  /**
+   * 顯示「N 筆任務」的警告區塊。
+   * design 提供兩個別名：`...-confirm-has-tasks`（語意）與 `...-task-warning`（位置），
+   * frontend 元件實際使用的是 `task-warning`，本欄回傳該值。
+   */
+  deleteDialogConfirmHasTasks: "project-delete-dialog-task-warning",
+  deleteDialogForceCheckbox: "project-delete-dialog-force-checkbox",
+  /**
+   * 強制刪除送出按鈕。design 列出 `force-button` 別名，但實際元件以
+   * 「force checkbox + confirm button」流程實作；本欄指向 `confirm`。
+   */
+  deleteDialogForceButton: "project-delete-dialog-confirm",
+  /** value 對齊 design：`project-delete-dialog-confirm` */
+  deleteDialogConfirmButton: "project-delete-dialog-confirm",
+  deleteDialogConfirm: "project-delete-dialog-confirm",
+  /** value 對齊 design：`project-delete-dialog-cancel` */
+  deleteDialogCancelButton: "project-delete-dialog-cancel",
+  deleteDialogCancel: "project-delete-dialog-cancel",
 
   // ===== Toast =====
-  toastCreated: "project-toast-created",
-  toastUpdated: "project-toast-updated",
-  toastDeleted: "project-toast-deleted",
+  toastCreated: "projects-toast-created",
+  toastUpdated: "projects-toast-updated",
+  toastDeleted: "projects-toast-deleted",
+  toastArchived: "projects-toast-archived",
   toastError: "project-toast-error",
 } as const;
 
