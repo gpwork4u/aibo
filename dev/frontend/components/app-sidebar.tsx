@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { UpcomingTasksWidget } from "@/components/task/upcoming-tasks-widget";
 
 type NavItem = {
   label: string;
@@ -90,7 +91,8 @@ export function AppSidebar({ inboxCount = 0, open, onClose }: AppSidebarProps) {
           <NavGroup title="設定" items={settings} pathname={pathname} />
         </nav>
 
-        <div className="border-t border-sidebar-border p-4">
+        <div className="border-t border-sidebar-border p-3 space-y-3">
+          <UpcomingTasksWidget />
           <p className="text-xs text-muted-foreground">aibo v1.0.0</p>
         </div>
       </aside>

@@ -111,6 +111,34 @@ export const PROJECTS_TESTIDS = {
   taskListEmpty: "project-task-list-empty",
   taskListRow: (id: string) => `task-list-row-${id}`,
   taskListRowCheck: (id: string) => `task-list-row-${id}-check`,
+
+  // Task Sheet (F-032c)
+  taskSheet: "task-sheet",
+  taskSheetTitle: "task-sheet-title",
+  taskSheetDescription: "task-sheet-description",
+  taskSheetStatus: "task-sheet-status",
+  taskSheetPriority: "task-sheet-priority",
+  taskSheetDueDate: "task-sheet-due-date",
+  taskSheetRefs: "task-sheet-refs",
+  taskSheetSave: "task-sheet-save",
+  taskSheetComplete: "task-sheet-complete",
+  taskSheetDelete: "task-sheet-delete",
+  taskSheetClose: "task-sheet-close",
+
+  // Refs Picker
+  refsPicker: "refs-picker",
+  refsPickerTab: (kind: string) => `refs-picker-tab-${kind}`,
+  refsPickerSearch: "refs-picker-search",
+  refsPickerResultItem: (id: string) => `refs-picker-result-${id}`,
+  refsPickerChip: (id: string) => `refs-picker-chip-${id}`,
+  refsPickerChipRemove: (id: string) => `refs-picker-chip-${id}-remove`,
+  refsPickerEmpty: "refs-picker-empty",
+  refsPickerSourceDeleted: "refs-picker-source-deleted",
+
+  // Upcoming Tasks Widget
+  upcomingWidget: "upcoming-tasks-widget",
+  upcomingWidgetEmpty: "upcoming-tasks-widget-empty",
+  upcomingWidgetItem: (id: string) => `upcoming-tasks-widget-item-${id}`,
 } as const;
 
 /** Project color palette（與 design/tokens/projects.json `project-color-palette` 對齊） */

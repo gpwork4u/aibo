@@ -12,6 +12,7 @@ import { ErrorState } from "@/components/error-state";
 import { KanbanBoard, type KanbanBoardTask } from "@/components/kanban/kanban-board";
 import { ProjectOverviewTab } from "@/components/projects/project-overview-tab";
 import { ProjectTaskListTab } from "@/components/projects/project-task-list-tab";
+import { TaskSheet } from "@/components/task/task-sheet";
 import { useProject } from "@/lib/hooks/use-projects";
 import {
   tasksKey,
@@ -29,6 +30,8 @@ export default function ProjectDetailPage() {
   const projectId = params?.id ?? "";
 
   const queryClient = useQueryClient();
+  const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = React.useState(false);
   const projectQ = useProject(projectId);
   const tasksQ = useProjectTasks(projectId);
   const updateMut = useUpdateTask(projectId);
@@ -121,8 +124,8 @@ export default function ProjectDetailPage() {
   );
 
   const handleOpenTask = React.useCallback((taskId: string) => {
-    // F-032c TaskSheet 後續實作；此處先 navigate 到 hash 作 placeholder
-    if (typeof window !== "undefined") window.location.hash = `task-${taskId}`;
+    setActiveTaskId(taskId);
+    setSheetOpen(true);
   }, []);
 
   const handleCompleteTask = React.useCallback(
@@ -223,6 +226,16 @@ export default function ProjectDetailPage() {
           <ProjectOverviewTab project={project} overdueCount={overdueCount} />
         </TabsContent>
       </Tabs>
+
+      <TaskSheet
+        taskId={activeTaskId}
+        projectId={projectId}
+        open={sheetOpen}
+        onOpenChange={(o) => {
+          setSheetOpen(o);
+          if (!o) setActiveTaskId(null);
+        }}
+      />
     </div>
   );
 }
