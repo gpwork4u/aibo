@@ -140,8 +140,14 @@ func main() {
 	journalDraftSvc := service.NewJournalDraftService(llmSvc, entryRepo, gcalSvc)
 	journalDraftHandler := handler.NewJournalDraftHandler(journalDraftSvc)
 
+	// 初始化專案服務（F-031b：CRUD + archive + force delete）
+	projectRepo := repository.NewProjectRepository(pool)
+	taskRepo := repository.NewTaskRepository(pool)
+	projectSvc := service.NewProjectService(projectRepo, taskRepo)
+	projectHandler := handler.NewProjectHandler(projectSvc)
+
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, projectHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
