@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { MonthView } from "@/components/calendar/month-view";
 import { WeekView } from "@/components/calendar/week-view";
@@ -42,7 +44,24 @@ function parseView(v: string | null): CalendarView {
   return v === "week" || v === "day" ? v : "month";
 }
 
+function CalendarPageSkeleton() {
+  return (
+    <div className="flex flex-col gap-4">
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-[480px] w-full" />
+    </div>
+  );
+}
+
 export default function CalendarPage() {
+  return (
+    <Suspense fallback={<CalendarPageSkeleton />}>
+      <CalendarPageInner />
+    </Suspense>
+  );
+}
+
+function CalendarPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tz = React.useMemo(resolveTimezone, []);
