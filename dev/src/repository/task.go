@@ -56,9 +56,8 @@ func mapTaskPgErr(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		if pgErr.Code == "23503" {
-			// FK 失敗：tasks.project_id 或 task_refs.task_id
-			if strings.Contains(pgErr.ConstraintName, "tasks_project_id") ||
-				strings.Contains(pgErr.Message, "tasks_project_id") {
+			// FK 失敗：僅以 ConstraintName 結構化判斷（避免依賴 locale-dependent Message）
+			if pgErr.ConstraintName == "tasks_project_id_fkey" {
 				return model.NewAppError(404, model.ErrCodeProjectNotFound, "專案不存在")
 			}
 			return model.NewAppError(400, model.ErrCodeInvalidInput, "外鍵約束失敗")
