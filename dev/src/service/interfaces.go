@@ -72,6 +72,8 @@ type GcalIntegrationRepository interface {
 	Get(ctx context.Context) (*model.GcalIntegration, error)
 	Upsert(ctx context.Context, integration *model.GcalIntegration) error
 	UpdateTokens(ctx context.Context, id interface{}, accessToken, refreshToken string, expiry interface{}) error
+	UpdateDefaultCalendarID(ctx context.Context, id uuid.UUID, calendarID string) error
+	DeleteAll(ctx context.Context) error
 	SaveOAuthState(ctx context.Context, state string) error
 	ValidateOAuthState(ctx context.Context, state string) (bool, error)
 	CleanExpiredOAuthStates(ctx context.Context) error
