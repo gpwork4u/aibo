@@ -139,7 +139,7 @@ export function ProjectFormDialog({
           err.body && typeof err.body === "object" && "code" in err.body
             ? String((err.body as { code: unknown }).code)
             : "";
-        if (code === "PROJECT_NAME_DUPLICATE" || code === "DUPLICATE" || true) {
+        if (code === "PROJECT_NAME_DUPLICATE" || code === "DUPLICATE") {
           form.setError("name", { type: "server", message: "名稱已存在" });
           return;
         }
