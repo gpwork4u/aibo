@@ -122,6 +122,33 @@ type JournalRepository interface {
 	GetSourceRefs(ctx context.Context, journalID uuid.UUID) ([]model.JournalSourceRef, error)
 }
 
+// ProjectRepository defines the interface for project data access (F-031).
+// Used by: ProjectService（將於 F-031b 引入）
+type ProjectRepository interface {
+	Create(ctx context.Context, p *model.Project) error
+	FindByID(ctx context.Context, id uuid.UUID) (*model.Project, error)
+	List(ctx context.Context, opts repository.ProjectListOptions) ([]*model.Project, int64, error)
+	Update(ctx context.Context, p *model.Project) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	CountTasks(ctx context.Context, projectID uuid.UUID) (int, map[string]int, error)
+	RecomputeProgress(ctx context.Context, projectID uuid.UUID) (int, error)
+}
+
+// TaskRepository defines the interface for task data access (F-031).
+// Used by: TaskService（將於 F-031c 引入）
+type TaskRepository interface {
+	Create(ctx context.Context, t *model.Task, refs []model.TaskRef) error
+	FindByID(ctx context.Context, id uuid.UUID) (*model.Task, []model.TaskRef, error)
+	ListByProject(ctx context.Context, projectID uuid.UUID, statusFilter []string) ([]*model.Task, error)
+	Update(ctx context.Context, t *model.Task) error
+	ReplaceRefs(ctx context.Context, taskID uuid.UUID, refs []model.TaskRef) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	ListUpcoming(ctx context.Context, days int) ([]*model.Task, error)
+	ListOverdue(ctx context.Context) ([]*model.Task, error)
+	CountByProject(ctx context.Context, projectID uuid.UUID) (int, error)
+	GetRefs(ctx context.Context, taskID uuid.UUID) ([]model.TaskRef, error)
+}
+
 // Compile-time interface satisfaction checks.
 // These ensure that the concrete repository structs implement the interfaces.
 var _ EntryRepository = (*repository.EntryRepository)(nil)
@@ -133,3 +160,5 @@ var _ ApiKeyRepository = (*repository.ApiKeyRepository)(nil)
 var _ StatsRepository = (*repository.StatsRepository)(nil)
 var _ SystemRepository = (*repository.SystemRepository)(nil)
 var _ JournalRepository = (*repository.JournalRepository)(nil)
+var _ ProjectRepository = (*repository.ProjectRepository)(nil)
+var _ TaskRepository = (*repository.TaskRepository)(nil)
