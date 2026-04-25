@@ -56,7 +56,9 @@ export const PROJECTS_TESTIDS = {
   deleteDialogTitle: "project-delete-dialog-title",
   deleteDialogTaskWarning: "project-delete-dialog-task-warning",
   deleteDialogTaskCount: "project-delete-dialog-task-count",
+  deleteDialogConfirmHasTasks: "project-delete-dialog-confirm-has-tasks", // 顯示「N 筆任務」警告區
   deleteDialogForceCheckbox: "project-delete-dialog-force-checkbox",
+  deleteDialogForceButton: "project-delete-dialog-force-button",          // 強制刪除送出按鈕
   deleteDialogConfirm: "project-delete-dialog-confirm",
   deleteDialogCancel: "project-delete-dialog-cancel",
   deleteDialogError: "project-delete-dialog-error",
@@ -91,7 +93,10 @@ export const PROJECTS_TESTIDS = {
   detailPage: "project-detail-page",
   detailHeader: "project-detail-header",
   detailHeaderName: "project-detail-header-name",
+  detailHeaderStatusBadge: "project-detail-header-status-badge",
   detailHeaderEdit: "project-detail-header-edit",
+  detailHeaderArchive: "project-detail-header-archive",
+  detailHeaderDelete: "project-detail-header-delete",
   detailTabs: "project-detail-tabs",
   detailTabBoard: "project-detail-tab-board",
   detailTabList: "project-detail-tab-list",
@@ -99,14 +104,19 @@ export const PROJECTS_TESTIDS = {
   detailNewTaskButton: "project-detail-new-task",
 
   // Overview tab
+  overviewPanel: "project-overview-panel",
   overviewProgress: "project-overview-progress",
   overviewProgressBar: "project-overview-progress-bar",
+  overviewProgressText: "project-overview-progress-text",
   overviewStats: "project-overview-stats",
   overviewStatTotal: "project-overview-stat-total",
   overviewStatDone: "project-overview-stat-done",
   overviewStatBlocked: "project-overview-stat-blocked",
   overviewStatOverdue: "project-overview-stat-overdue",
   overviewTimeline: "project-overview-timeline",
+  overviewDates: "project-overview-dates",
+  overviewStartDate: "project-overview-start-date",
+  overviewEndDate: "project-overview-end-date",
   overviewDescription: "project-overview-description",
   overviewActivity: "project-overview-activity",
   overviewActivityItem: "project-overview-activity-item",   // suffix -{idx}
