@@ -15,14 +15,22 @@ const LOCAL_STORAGE_KEY = "aibo_api_key";
 /**
  * 將 API Key 寫入瀏覽器 localStorage
  *
- * 必須已經 navigate 到 baseURL domain 之後才能呼叫。
+ * 透過 `addInitScript` 在每個 document load 前注入 localStorage，
+ * 避免 root page（`app/page.tsx`）的 useEffect 因為「localStorage 還沒寫入」
+ * 而 redirect 到 `/bootstrap` onboarding 頁面。
+ *
+ * 必須在 `page.goto(...)` 之前呼叫；作用於整個 BrowserContext。
  */
 export async function setupAuth(page: Page, apiKey: string): Promise<void> {
-  await page.evaluate(
+  await page.context().addInitScript(
     ({ key, value }) => {
-      localStorage.setItem(key, value);
+      try {
+        window.localStorage.setItem(key, value);
+      } catch {
+        // ignore storage failures (e.g. private mode safari) — app handles fallback
+      }
     },
-    { key: LOCAL_STORAGE_KEY, value: apiKey }
+    { key: LOCAL_STORAGE_KEY, value: apiKey },
   );
 }
 
@@ -30,7 +38,8 @@ export async function setupAuth(page: Page, apiKey: string): Promise<void> {
  * 建立已認證的測試環境
  *
  * - 透過 API bootstrap 或 create 一把 key
- * - 開啟首頁並注入 localStorage
+ * - 用 addInitScript 在頁面 load 前注入 localStorage（避免 onboarding redirect）
+ * - 不主動 page.goto；caller 自己決定要去哪一頁
  */
 export async function createAuthenticatedSession(
   page: Page,
@@ -38,11 +47,7 @@ export async function createAuthenticatedSession(
   keyName = `browser-test-${Date.now()}`
 ): Promise<{ client: ApiClient; apiKey: string }> {
   const { client, key } = await ApiClient.bootstrap(request, keyName);
-
-  // 先導航到首頁，localStorage domain 才會正確
-  await page.goto("/");
   await setupAuth(page, key);
-
   return { client, apiKey: key };
 }
 
