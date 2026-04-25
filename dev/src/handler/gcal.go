@@ -5,9 +5,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/gpwork4u/aibo/dto"
 	"github.com/gpwork4u/aibo/model"
 	"github.com/gpwork4u/aibo/service"
+	"google.golang.org/api/calendar/v3"
 )
 
 // GcalHandler Google Calendar 整合 handler
@@ -122,4 +124,104 @@ func (h *GcalHandler) Import(c *gin.Context) {
 		EntriesCreated: entriesCreated,
 		EntriesSkipped: entriesSkipped,
 	})
+}
+
+// ListEventsExternal F-030c read-through events API
+// GET /api/v1/integrations/gcal/events
+//
+// Query：
+//   - since/until：ISO 8601；預設 -7d ~ +7d
+//   - calendar_id：optional，預設 "primary"
+//   - include_recurring：default true
+//
+// 回應：dto.ListGcalEventsResponse，含每筆 event 的 linked_entry_id
+//
+// 錯誤映射：
+//   - 424 GCAL_NOT_CONNECTED — 未授權
+//   - 401 GCAL_REAUTH_REQUIRED — refresh token 失效
+//   - 401 GCAL_TOKEN_EXPIRED — refresh 暫時失敗（網路等）
+//   - 502 GCAL_UPSTREAM_ERROR — Google API 錯誤
+func (h *GcalHandler) ListEventsExternal(c *gin.Context) {
+	now := time.Now().UTC()
+	since := now.AddDate(0, 0, -7)
+	until := now.AddDate(0, 0, 7)
+
+	if v := c.Query("since"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: model.ErrCodeInvalidInput, Message: "since 格式無效，須為 ISO 8601"})
+			return
+		}
+		since = parsed
+	}
+	if v := c.Query("until"); v != "" {
+		parsed, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: model.ErrCodeInvalidInput, Message: "until 格式無效，須為 ISO 8601"})
+			return
+		}
+		until = parsed
+	}
+
+	calendarID := c.Query("calendar_id")
+	if calendarID == "" {
+		calendarID = "primary"
+	}
+
+	includeRecurring := true
+	if v := c.Query("include_recurring"); v == "false" {
+		includeRecurring = false
+	}
+
+	items, err := h.gcalSvc.ListEventsWithLinks(c.Request.Context(), calendarID, since, until, includeRecurring)
+	if err != nil {
+		if appErr, ok := err.(*model.AppError); ok {
+			c.JSON(appErr.Status, dto.ErrorResponse{Code: appErr.Code, Message: appErr.Message})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: "INTERNAL_ERROR", Message: "伺服器內部錯誤"})
+		return
+	}
+
+	out := make([]dto.GcalEventResponse, 0, len(items))
+	for _, item := range items {
+		out = append(out, toGcalEventResponse(item.Event, item.LinkedEntryID))
+	}
+	c.JSON(http.StatusOK, dto.ListGcalEventsResponse{Events: out})
+}
+
+// toGcalEventResponse 把 *calendar.Event 轉成 API DTO。
+func toGcalEventResponse(ev *calendar.Event, linkedEntryID uuid.UUID) dto.GcalEventResponse {
+	resp := dto.GcalEventResponse{
+		GcalID:      ev.Id,
+		Summary:     ev.Summary,
+		Description: ev.Description,
+		Location:    ev.Location,
+		HTMLLink:    ev.HtmlLink,
+	}
+	// start / end / all_day
+	if ev.Start != nil {
+		if ev.Start.DateTime != "" {
+			resp.Start = ev.Start.DateTime
+		} else if ev.Start.Date != "" {
+			resp.Start = ev.Start.Date
+			resp.AllDay = true
+		}
+	}
+	if ev.End != nil {
+		if ev.End.DateTime != "" {
+			resp.End = ev.End.DateTime
+		} else if ev.End.Date != "" {
+			resp.End = ev.End.Date
+		}
+	}
+	if ev.RecurringEventId != "" {
+		v := ev.RecurringEventId
+		resp.RecurringEventID = &v
+	}
+	if linkedEntryID != uuid.Nil {
+		v := linkedEntryID.String()
+		resp.LinkedEntryID = &v
+	}
+	return resp
 }

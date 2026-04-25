@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -194,7 +195,7 @@ func (s *GcalService) ListEvents(
 		return nil, fmt.Errorf("查詢 GcalIntegration 失敗: %w", err)
 	}
 	if integration == nil {
-		return nil, model.NewAppError(http.StatusUnauthorized, model.ErrCodeGcalNotConnected, "Google Calendar 尚未授權")
+		return nil, model.NewAppError(http.StatusFailedDependency, model.ErrCodeGcalNotConnected, "Google Calendar 尚未授權")
 	}
 
 	// 解密 tokens
@@ -232,7 +233,7 @@ func (s *GcalService) ListEvents(
 	tokenSource := oauthCfg.TokenSource(ctx, token)
 	newToken, err := tokenSource.Token()
 	if err != nil {
-		return nil, model.NewAppError(http.StatusUnauthorized, model.ErrCodeGcalTokenExpired, "Token 過期且 refresh 失敗，請重新授權")
+		return nil, detectReauthError(err)
 	}
 
 	// 如果 token 被 refresh 了，更新到 DB
@@ -265,9 +266,71 @@ func (s *GcalService) ListEvents(
 
 	events, err := call.Do()
 	if err != nil {
-		return nil, fmt.Errorf("列出 Calendar 事件失敗: %w", err)
+		return nil, mapGcalAPIError(err)
 	}
 	return events.Items, nil
+}
+
+// detectReauthError 將 oauth2 token refresh 錯誤轉成 AppError。
+//
+// 偵測 *oauth2.RetrieveError + ErrorCode == "invalid_grant"（refresh token 已撤銷）
+// 或文字含 "invalid_grant"，回 401 GCAL_REAUTH_REQUIRED；其餘 refresh 失敗仍視為
+// 需要重新授權（保險起見一律走 reauth），但保留 GCAL_TOKEN_EXPIRED 給呼叫端區分。
+//
+// 注意：此函式回傳的錯誤一律是 *model.AppError，handler 透過既有 type assertion
+// 即可拿到正確的 status / code。
+func detectReauthError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var retrieveErr *oauth2.RetrieveError
+	if errors.As(err, &retrieveErr) {
+		// invalid_grant：refresh token 已撤銷或失效，必須重新授權
+		if retrieveErr.ErrorCode == "invalid_grant" {
+			return model.NewAppError(http.StatusUnauthorized, model.ErrCodeGcalReauthRequired, "Refresh token 失效，請重新授權")
+		}
+		// 其他 OAuth2 錯誤（invalid_client、unauthorized_client...）也視為需要重新授權
+		return model.NewAppError(http.StatusUnauthorized, model.ErrCodeGcalReauthRequired, "OAuth refresh 失敗，請重新授權: "+retrieveErr.ErrorCode)
+	}
+	// 非 RetrieveError 的 refresh 錯誤（例如網路錯誤）一律 401 token expired，
+	// 提示使用者重新授權即可恢復。
+	return model.NewAppError(http.StatusUnauthorized, model.ErrCodeGcalTokenExpired, "Token 過期且 refresh 失敗，請重新授權")
+}
+
+// ListEventsWithLinks 在 ListEvents 之上補上 linked_entry_id：
+// 對每筆 event 查 entries 表，若已有對應 entry（source_type='gcal' + source_ref=event.Id）
+// 則回填 entry ID；否則回 uuid.Nil。
+//
+// 用於 F-030c 的 GET /api/v1/integrations/gcal/events 對外端點，
+// 讓前端能直接判斷哪些 gcal event 已轉成 entry。
+func (s *GcalService) ListEventsWithLinks(
+	ctx context.Context,
+	calendarID string,
+	since, until time.Time,
+	singleEvents bool,
+) ([]GcalEventWithLink, error) {
+	items, err := s.ListEvents(ctx, calendarID, since, until, singleEvents)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]GcalEventWithLink, 0, len(items))
+	for _, ev := range items {
+		linked, lookupErr := s.entryRepo.GetByGcalRef(ctx, ev.Id)
+		if lookupErr != nil {
+			// 不致命：紀錄後當作未連結
+			slog.WarnContext(ctx, "查 entry by gcal_ref 失敗", "gcal_id", ev.Id, "error", lookupErr)
+			linked = uuid.Nil
+		}
+		out = append(out, GcalEventWithLink{Event: ev, LinkedEntryID: linked})
+	}
+	return out, nil
+}
+
+// GcalEventWithLink 是 *calendar.Event 加上對應的 entry ID（若已轉成 entry）。
+type GcalEventWithLink struct {
+	Event         *calendar.Event
+	LinkedEntryID uuid.UUID
 }
 
 // ImportEvents 匯入 Google Calendar 事件
@@ -391,7 +454,7 @@ func (s *GcalService) GetEvent(ctx context.Context, calendarID, eventID string) 
 	tokenSource := oauthCfg.TokenSource(ctx, token)
 	newToken, err := tokenSource.Token()
 	if err != nil {
-		return nil, model.NewAppError(http.StatusUnauthorized, model.ErrCodeGcalTokenExpired, "Token 過期且 refresh 失敗，請重新授權")
+		return nil, detectReauthError(err)
 	}
 
 	// refresh 後持久化

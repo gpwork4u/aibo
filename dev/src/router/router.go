@@ -91,6 +91,8 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 		{
 			integrations.POST("/gcal/auth", gcalHandler.StartAuth)
 			integrations.GET("/gcal/callback", gcalHandler.Callback)
+			// F-030c：read-through events + reauth detection
+			integrations.GET("/gcal/events", gcalHandler.ListEventsExternal)
 		}
 
 		// 匯入

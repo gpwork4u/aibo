@@ -22,6 +22,7 @@ type EntryRepository interface {
 	FlagEntry(ctx context.Context, id uuid.UUID, reason string, note *string) (*model.Entry, *model.EntryFlag, error)
 	GetFlags(ctx context.Context, entryID uuid.UUID) ([]model.EntryFlag, error)
 	ExistsBySourceRef(ctx context.Context, sourceType, sourceRef string) (bool, error)
+	GetByGcalRef(ctx context.Context, gcalID string) (uuid.UUID, error)
 	CategoryExists(ctx context.Context, id uuid.UUID) (bool, error)
 	// ListByDateRange 依日期區間撈取 entry（F-026 行事曆彙整 API 使用）
 	ListByDateRange(ctx context.Context, sinceDate, untilDate string, tz string) ([]dto.CalendarEntrySummary, error)

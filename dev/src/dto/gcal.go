@@ -25,3 +25,22 @@ type GcalImportResponse struct {
 	EntriesCreated int `json:"entries_created"`
 	EntriesSkipped int `json:"entries_skipped"`
 }
+
+// GcalEventResponse F-030c GET /events 單筆回應
+type GcalEventResponse struct {
+	GcalID           string  `json:"gcal_id"`
+	Summary          string  `json:"summary"`
+	Description      string  `json:"description"`
+	Location         string  `json:"location"`
+	Start            string  `json:"start"`
+	End              string  `json:"end"`
+	AllDay           bool    `json:"all_day"`
+	RecurringEventID *string `json:"recurring_event_id"`
+	HTMLLink         string  `json:"html_link"`
+	LinkedEntryID    *string `json:"linked_entry_id"`
+}
+
+// ListGcalEventsResponse F-030c GET /events 回應包裝
+type ListGcalEventsResponse struct {
+	Events []GcalEventResponse `json:"events"`
+}
