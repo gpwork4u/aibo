@@ -20,6 +20,7 @@ const (
 	ErrCodeAlreadyLinked     = "ALREADY_LINKED"
 	ErrCodeEventNotFound     = "EVENT_NOT_FOUND"
 	ErrCodeGcalUpstream      = "GCAL_UPSTREAM_ERROR"
+	ErrCodeGcalReauthRequired = "GCAL_REAUTH_REQUIRED"
 )
 
 // AppError 應用程式錯誤

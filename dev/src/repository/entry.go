@@ -448,6 +448,34 @@ func (r *EntryRepository) GetFlags(ctx context.Context, entryID uuid.UUID) ([]mo
 	return flags, nil
 }
 
+// GetByGcalRef 依 gcal event ID 查找對應的 entry ID。
+//
+// 用於 F-030c read-through API 在回傳 events 時補齊 linked_entry_id 欄位：
+// 若該 gcal event 已被使用者轉成 entry（透過 F-026c），回傳該 entry 的 UUID；
+// 否則回傳 (uuid.Nil, nil)。
+//
+// 查詢條件：source_type = 'gcal' AND source_ref = gcalID，取最新一筆（理論上只會有一筆，
+// 因為 uq_entries_gcal_ref 唯一索引）。
+func (r *EntryRepository) GetByGcalRef(ctx context.Context, gcalID string) (uuid.UUID, error) {
+	if gcalID == "" {
+		return uuid.Nil, nil
+	}
+	var id uuid.UUID
+	err := r.pool.QueryRow(ctx,
+		`SELECT id FROM entries
+		 WHERE source_type = 'gcal' AND source_ref = $1
+		 LIMIT 1`,
+		gcalID,
+	).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, nil
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return id, nil
+}
+
 // ExistsBySourceRef 檢查指定 source_type + source_ref 的 entry 是否已存在（用於去重）
 func (r *EntryRepository) ExistsBySourceRef(ctx context.Context, sourceType, sourceRef string) (bool, error) {
 	var exists bool
