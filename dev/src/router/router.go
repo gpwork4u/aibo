@@ -10,7 +10,7 @@ import (
 )
 
 // Setup 設定路由
-func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler, calendarHandler *handler.CalendarHandler, journalHandler *handler.JournalHandler, journalDraftHandler *handler.JournalDraftHandler, projectHandler *handler.ProjectHandler) *gin.Engine {
+func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler, calendarHandler *handler.CalendarHandler, journalHandler *handler.JournalHandler, journalDraftHandler *handler.JournalDraftHandler, projectHandler *handler.ProjectHandler, taskHandler *handler.TaskHandler) *gin.Engine {
 	r := gin.Default()
 
 	// CORS middleware — 允許跨網域（前端 localhost:3000 呼叫 API localhost:8080）
@@ -151,6 +151,22 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 			projects.PATCH("/:id", projectHandler.Update)
 			projects.DELETE("/:id", projectHandler.Delete)
 			projects.POST("/:id/archive", projectHandler.Archive)
+
+			// 巢狀 task：建立 / 列表（F-031c）
+			projects.POST("/:id/tasks", taskHandler.CreateInProject)
+			projects.GET("/:id/tasks", taskHandler.ListByProject)
+		}
+
+		// 任務（F-031c：詳情 / 更新 / 完成 / 刪除 / upcoming / overdue）
+		// 注意：/upcoming /overdue 必須在 /:id 之前以避免誤匹配
+		tasks := v1.Group("/tasks")
+		{
+			tasks.GET("/upcoming", taskHandler.Upcoming)
+			tasks.GET("/overdue", taskHandler.Overdue)
+			tasks.GET("/:id", taskHandler.GetByID)
+			tasks.PATCH("/:id", taskHandler.Update)
+			tasks.POST("/:id/complete", taskHandler.Complete)
+			tasks.DELETE("/:id", taskHandler.Delete)
 		}
 	}
 

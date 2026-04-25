@@ -146,8 +146,12 @@ func main() {
 	projectSvc := service.NewProjectService(projectRepo, taskRepo)
 	projectHandler := handler.NewProjectHandler(projectSvc)
 
+	// 初始化任務服務（F-031c：CRUD + complete + upcoming/overdue）
+	taskSvc := service.NewTaskService(taskRepo, projectRepo, entryRepo, journalRepo, projectSvc)
+	taskHandler := handler.NewTaskHandler(taskSvc, projectSvc)
+
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, projectHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, projectHandler, taskHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
