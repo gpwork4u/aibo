@@ -93,6 +93,11 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 			integrations.GET("/gcal/callback", gcalHandler.Callback)
 			// F-030c：read-through events + reauth detection
 			integrations.GET("/gcal/events", gcalHandler.ListEventsExternal)
+			// F-030b：連線狀態 / 可選日曆 / 設定 / 中斷連線
+			integrations.GET("/gcal/status", gcalHandler.GetStatus)
+			integrations.GET("/gcal/calendars", gcalHandler.ListCalendars)
+			integrations.PUT("/gcal/settings", gcalHandler.UpdateSettings)
+			integrations.DELETE("/gcal", gcalHandler.Disconnect)
 		}
 
 		// 匯入

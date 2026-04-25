@@ -43,4 +43,35 @@ type GcalEventResponse struct {
 // ListGcalEventsResponse F-030c GET /events 回應包裝
 type ListGcalEventsResponse struct {
 	Events []GcalEventResponse `json:"events"`
+// GcalStatusResponse Google Calendar 連線狀態回應（F-030b）
+//
+// 未連線時 `Connected=false`，其餘欄位省略（json omitempty）。
+// 已連線時補齊 email / connected_at / access_token_expires_at / default_calendar_id。
+type GcalStatusResponse struct {
+	Connected            bool    `json:"connected"`
+	Email                string  `json:"email,omitempty"`
+	ConnectedAt          *string `json:"connected_at,omitempty"`
+	AccessTokenExpiresAt *string `json:"access_token_expires_at,omitempty"`
+	DefaultCalendarID    string  `json:"default_calendar_id,omitempty"`
+}
+
+// GcalCalendar 單一可選 Google Calendar 條目（F-030b）
+type GcalCalendar struct {
+	ID       string `json:"id"`
+	Summary  string `json:"summary"`
+	Primary  bool   `json:"primary"`
+	TimeZone string `json:"time_zone"`
+}
+
+// GcalCalendarsResponse 列出可選日曆回應（F-030b）
+type GcalCalendarsResponse struct {
+	Calendars []*GcalCalendar `json:"calendars"`
+}
+
+// GcalUpdateSettingsRequest 更新預設日曆設定（F-030b）
+//
+// `default_calendar_id` 必填，空字串會被視為 invalid input；若呼叫端要回到預設行為，
+// 應該傳 `"primary"`。
+type GcalUpdateSettingsRequest struct {
+	DefaultCalendarID string `json:"default_calendar_id"`
 }

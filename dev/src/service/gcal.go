@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gpwork4u/aibo/crypto"
+	"github.com/gpwork4u/aibo/dto"
 	"github.com/gpwork4u/aibo/model"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -535,6 +536,178 @@ func buildEventContent(event *calendar.Event) string {
 	}
 
 	return content
+}
+
+// GetStatus 回傳目前 Google Calendar 連線狀態（F-030b）。
+//
+// 未連 → `{Connected:false}`；已連 → 補齊 email / connected_at /
+// access_token_expires_at / default_calendar_id。
+//
+// `AccessTokenExpiresAt` 採新欄位優先，若 nil 則 fallback 至既有 `TokenExpiry`。
+func (s *GcalService) GetStatus(ctx context.Context) (*dto.GcalStatusResponse, error) {
+	integration, err := s.gcalRepo.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("查詢 GcalIntegration 失敗: %w", err)
+	}
+	if integration == nil {
+		return &dto.GcalStatusResponse{Connected: false}, nil
+	}
+
+	connectedAt := integration.CreatedAt.UTC().Format(time.RFC3339)
+
+	var expiresStr string
+	if integration.AccessTokenExpiresAt != nil && !integration.AccessTokenExpiresAt.IsZero() {
+		expiresStr = integration.AccessTokenExpiresAt.UTC().Format(time.RFC3339)
+	} else if !integration.TokenExpiry.IsZero() {
+		expiresStr = integration.TokenExpiry.UTC().Format(time.RFC3339)
+	}
+
+	defaultCal := integration.DefaultCalendarID
+	if defaultCal == "" {
+		defaultCal = "primary"
+	}
+
+	resp := &dto.GcalStatusResponse{
+		Connected:         true,
+		Email:             integration.Email,
+		ConnectedAt:       &connectedAt,
+		DefaultCalendarID: defaultCal,
+	}
+	if expiresStr != "" {
+		resp.AccessTokenExpiresAt = &expiresStr
+	}
+	return resp, nil
+}
+
+// ListCalendars 列出目前已授權使用者可選的 Google Calendar 列表（F-030b）。
+//
+// 錯誤映射：
+//   - 未連 → AppError{424, GCAL_NOT_CONNECTED}
+//   - refresh token 失效 → AppError{401, GCAL_REAUTH_REQUIRED}
+//   - 其他 Google API 錯誤 → AppError{502, GCAL_UPSTREAM_ERROR}
+func (s *GcalService) ListCalendars(ctx context.Context) ([]*dto.GcalCalendar, error) {
+	srv, err := s.calendarServiceForCurrent(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	list, err := srv.CalendarList.List().Context(ctx).Do()
+	if err != nil {
+		return nil, mapGcalAPIError(err)
+	}
+
+	out := make([]*dto.GcalCalendar, 0, len(list.Items))
+	for _, item := range list.Items {
+		out = append(out, &dto.GcalCalendar{
+			ID:       item.Id,
+			Summary:  item.Summary,
+			Primary:  item.Primary,
+			TimeZone: item.TimeZone,
+		})
+	}
+	return out, nil
+}
+
+// UpdateDefaultCalendar 更新使用者選定的預設日曆 ID（F-030b）。
+//
+// 空字串視為 invalid input；未連 → AppError{424, GCAL_NOT_CONNECTED}。
+func (s *GcalService) UpdateDefaultCalendar(ctx context.Context, calendarID string) (*dto.GcalStatusResponse, error) {
+	if calendarID == "" {
+		return nil, model.NewAppError(http.StatusBadRequest, model.ErrCodeInvalidInput, "default_calendar_id 為必填")
+	}
+
+	integration, err := s.gcalRepo.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("查詢 GcalIntegration 失敗: %w", err)
+	}
+	if integration == nil {
+		return nil, model.NewAppError(http.StatusFailedDependency, model.ErrCodeGcalNotConnected, "Google Calendar 尚未授權")
+	}
+
+	if err := s.gcalRepo.UpdateDefaultCalendarID(ctx, integration.ID, calendarID); err != nil {
+		return nil, fmt.Errorf("更新 default_calendar_id 失敗: %w", err)
+	}
+
+	slog.Info("Google Calendar 預設日曆已更新", "default_calendar_id", calendarID)
+	return s.GetStatus(ctx)
+}
+
+// Disconnect 中斷 Google Calendar 連線（F-030b）。
+//
+// 直接清除 token（gcalRepo.DeleteAll），不嘗試呼叫 Google revoke endpoint。
+// 已轉換的 entries 保留（不在本層處理）。Idempotent：未連時也回 nil。
+func (s *GcalService) Disconnect(ctx context.Context) error {
+	if err := s.gcalRepo.DeleteAll(ctx); err != nil {
+		return fmt.Errorf("中斷 Google Calendar 連線失敗: %w", err)
+	}
+	slog.Info("Google Calendar 連線已中斷")
+	return nil
+}
+
+// calendarServiceForCurrent 為目前已連使用者建立可自動 refresh 的 calendar.Service。
+//
+// 與 ListEvents / GetEvent 同樣的 token refresh 路徑，差別在於將 refresh 失敗映射為
+// F-030 規格的 `GCAL_REAUTH_REQUIRED`（401），而不是既有的 `GCAL_TOKEN_EXPIRED`。
+func (s *GcalService) calendarServiceForCurrent(ctx context.Context) (*calendar.Service, error) {
+	integration, err := s.gcalRepo.Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("查詢 GcalIntegration 失敗: %w", err)
+	}
+	if integration == nil {
+		return nil, model.NewAppError(http.StatusFailedDependency, model.ErrCodeGcalNotConnected, "Google Calendar 尚未授權")
+	}
+
+	accessToken, err := s.aesCrypto.Decrypt(integration.AccessToken)
+	if err != nil {
+		return nil, fmt.Errorf("解密 access_token 失敗: %w", err)
+	}
+	refreshToken, err := s.aesCrypto.Decrypt(integration.RefreshToken)
+	if err != nil {
+		return nil, fmt.Errorf("解密 refresh_token 失敗: %w", err)
+	}
+	clientSecret, err := s.aesCrypto.Decrypt(integration.ClientSecret)
+	if err != nil {
+		return nil, fmt.Errorf("解密 client_secret 失敗: %w", err)
+	}
+
+	token := &oauth2.Token{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+		Expiry:       integration.TokenExpiry,
+	}
+	oauthCfg := &oauth2.Config{
+		ClientID:     integration.ClientID,
+		ClientSecret: clientSecret,
+		RedirectURL:  s.config.RedirectURL,
+		Scopes:       []string{calendar.CalendarReadonlyScope},
+		Endpoint:     google.Endpoint,
+	}
+
+	tokenSource := oauthCfg.TokenSource(ctx, token)
+	newToken, err := tokenSource.Token()
+	if err != nil {
+		return nil, model.NewAppError(http.StatusUnauthorized, model.ErrCodeGcalReauthRequired, "Refresh token 失效，請重新授權")
+	}
+
+	if newToken.AccessToken != accessToken {
+		slog.Info("Google Calendar token 已自動 refresh")
+		encNewAccess, encErr := s.aesCrypto.Encrypt(newToken.AccessToken)
+		if encErr == nil {
+			encNewRefresh := integration.RefreshToken
+			if newToken.RefreshToken != "" && newToken.RefreshToken != refreshToken {
+				encNewRefresh, _ = s.aesCrypto.Encrypt(newToken.RefreshToken)
+			}
+			_ = s.gcalRepo.UpdateTokens(ctx, integration.ID, encNewAccess, encNewRefresh, newToken.Expiry)
+		}
+	}
+
+	client := oauth2.NewClient(ctx, tokenSource)
+	srv, err := calendar.NewService(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		return nil, fmt.Errorf("建立 Calendar service 失敗: %w", err)
+	}
+	return srv, nil
 }
 
 // generateRandomState 產生隨機 state 字串

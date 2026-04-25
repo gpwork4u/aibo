@@ -174,6 +174,10 @@ func (h *GcalHandler) ListEventsExternal(c *gin.Context) {
 	}
 
 	items, err := h.gcalSvc.ListEventsWithLinks(c.Request.Context(), calendarID, since, until, includeRecurring)
+// GetStatus 查詢 Google Calendar 連線狀態（F-030b）
+// GET /api/v1/integrations/gcal/status
+func (h *GcalHandler) GetStatus(c *gin.Context) {
+	resp, err := h.gcalSvc.GetStatus(c.Request.Context())
 	if err != nil {
 		if appErr, ok := err.(*model.AppError); ok {
 			c.JSON(appErr.Status, dto.ErrorResponse{Code: appErr.Code, Message: appErr.Message})
@@ -224,4 +228,53 @@ func toGcalEventResponse(ev *calendar.Event, linkedEntryID uuid.UUID) dto.GcalEv
 		resp.LinkedEntryID = &v
 	}
 	return resp
+	c.JSON(http.StatusOK, resp)
+}
+
+// ListCalendars 列出可選 Google Calendar（F-030b）
+// GET /api/v1/integrations/gcal/calendars
+func (h *GcalHandler) ListCalendars(c *gin.Context) {
+	calendars, err := h.gcalSvc.ListCalendars(c.Request.Context())
+	if err != nil {
+		if appErr, ok := err.(*model.AppError); ok {
+			c.JSON(appErr.Status, dto.ErrorResponse{Code: appErr.Code, Message: appErr.Message})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: "INTERNAL_ERROR", Message: "伺服器內部錯誤"})
+		return
+	}
+	c.JSON(http.StatusOK, dto.GcalCalendarsResponse{Calendars: calendars})
+}
+
+// UpdateSettings 更新 Google Calendar 設定（F-030b）
+// PUT /api/v1/integrations/gcal/settings
+func (h *GcalHandler) UpdateSettings(c *gin.Context) {
+	var req dto.GcalUpdateSettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Code: model.ErrCodeInvalidInput, Message: "請求 body 格式無效"})
+		return
+	}
+
+	resp, err := h.gcalSvc.UpdateDefaultCalendar(c.Request.Context(), req.DefaultCalendarID)
+	if err != nil {
+		if appErr, ok := err.(*model.AppError); ok {
+			c.JSON(appErr.Status, dto.ErrorResponse{Code: appErr.Code, Message: appErr.Message})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: "INTERNAL_ERROR", Message: "伺服器內部錯誤"})
+		return
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// Disconnect 中斷 Google Calendar 連線（F-030b）
+// DELETE /api/v1/integrations/gcal
+//
+// Idempotent：未連時也回 204。
+func (h *GcalHandler) Disconnect(c *gin.Context) {
+	if err := h.gcalSvc.Disconnect(c.Request.Context()); err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: "INTERNAL_ERROR", Message: "伺服器內部錯誤"})
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
