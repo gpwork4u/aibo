@@ -54,7 +54,10 @@ export function GcalStatusCard() {
   const handleConnect = async () => {
     try {
       const res = await startAuth.mutateAsync();
-      window.location.href = res.auth_url;
+      // OAuth 必須 hard redirect 到外部 URL，但需 SSR guard 避免 server-side 誤觸發
+      if (typeof window !== "undefined") {
+        window.location.href = res.auth_url;
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "啟動授權失敗");
     }

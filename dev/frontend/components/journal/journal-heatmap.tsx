@@ -19,8 +19,16 @@ interface JournalHeatmapProps {
   data: HeatmapDatum[];
 }
 
+// 以瀏覽器當地時區算出 YYYY-MM-DD，避免使用 toISOString() 在非 UTC 時區
+// 凌晨打開頁面時 heatmap 格子被歸到前一天的問題。
+const LOCAL_YMD_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 function ymd(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return LOCAL_YMD_FORMATTER.format(d);
 }
 
 function eachDay(start: Date, end: Date): Date[] {
@@ -78,6 +86,7 @@ export function JournalHeatmap({
               data-testid={JOURNAL_TESTIDS.heatmapCell(ds)}
               data-intensity={intensity}
               title={`${ds}${intensity > 0 ? " · 已寫" : ""}`}
+              aria-label={`${ds}${intensity > 0 ? "（已寫日記）" : "（尚未撰寫）"}`}
               className={cn(
                 "aspect-square rounded-sm transition-opacity hover:opacity-70",
                 INTENSITY_CLASS[Math.min(intensity, 4)],
