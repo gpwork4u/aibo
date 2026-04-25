@@ -21,6 +21,14 @@ const (
 	ErrCodeEventNotFound     = "EVENT_NOT_FOUND"
 	ErrCodeGcalUpstream      = "GCAL_UPSTREAM_ERROR"
 	ErrCodeGcalReauthRequired = "GCAL_REAUTH_REQUIRED"
+
+	// F-031 專案/任務 錯誤碼
+	ErrCodeProjectNameDuplicate    = "PROJECT_NAME_DUPLICATE"
+	ErrCodeProjectHasTasks         = "PROJECT_HAS_TASKS"
+	ErrCodeTooManyTasks            = "TOO_MANY_TASKS"
+	ErrCodeInvalidStatusTransition = "INVALID_STATUS_TRANSITION"
+	ErrCodeProjectNotFound         = "PROJECT_NOT_FOUND"
+	ErrCodeTaskNotFound            = "TASK_NOT_FOUND"
 )
 
 // AppError 應用程式錯誤
