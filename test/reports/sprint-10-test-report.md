@@ -1,7 +1,22 @@
 # Sprint 10 Test Report
 
-**日期**: 2026-04-25
-**狀態**: 🔴 **BLOCKED**（環境/auth 阻擋，未產出可信賴的測試結果）
+**日期**: 2026-04-25（更新版）
+**狀態**: 🟡 **PARTIAL**（auth helper 已修，e2e 解 skip + 跑綠仍待 Sprint 11 完成）
+
+## 更新摘要（2026-04-25 後續）
+
+- ✅ Bug #94 production build 失敗已修（PR #136 merged）
+- ✅ e2e auth helper 改用 `addInitScript` 修好 onboarding redirect（PR #139 merged）
+- ⏳ Sprint 10 的 26 個 e2e 仍為 `test.skip(true, ...)` 狀態，未實際跑綠
+- ⏳ Sprint 8 / 9 的 e2e 也尚未產出 ALL PASSED 報告
+
+故 release gate #2「Test Report ALL PASSED」**仍未滿足**，需要 Sprint 11 接續：
+1. 逐個解 sprint 8/9/10 的 test.skip
+2. 跑 Playwright 全綠
+3. 修暴露的 bug
+4. 產出 ALL PASSED 報告
+
+
 
 ## 環境
 
