@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gpwork4u/aibo/dto"
@@ -106,6 +107,18 @@ type SystemRepository interface {
 	ExtensionInstalled(ctx context.Context, extName string) (bool, error)
 }
 
+// JournalRepository defines the interface for daily journal data access (F-028).
+// Used by: JournalService（將於 F-028b 引入）
+type JournalRepository interface {
+	Create(ctx context.Context, j *model.Journal, refs []model.JournalSourceRef) error
+	GetByDate(ctx context.Context, date time.Time) (*model.Journal, []model.JournalSourceRef, error)
+	Update(ctx context.Context, date time.Time, patch *dto.UpdateJournalRequest) (*model.Journal, error)
+	Delete(ctx context.Context, date time.Time) error
+	List(ctx context.Context, opts repository.JournalListOptions) ([]*model.Journal, int64, error)
+	ReplaceSourceRefs(ctx context.Context, journalID uuid.UUID, refs []model.JournalSourceRef) error
+	GetSourceRefs(ctx context.Context, journalID uuid.UUID) ([]model.JournalSourceRef, error)
+}
+
 // Compile-time interface satisfaction checks.
 // These ensure that the concrete repository structs implement the interfaces.
 var _ EntryRepository = (*repository.EntryRepository)(nil)
@@ -116,3 +129,4 @@ var _ GcalIntegrationRepository = (*repository.GcalIntegrationRepository)(nil)
 var _ ApiKeyRepository = (*repository.ApiKeyRepository)(nil)
 var _ StatsRepository = (*repository.StatsRepository)(nil)
 var _ SystemRepository = (*repository.SystemRepository)(nil)
+var _ JournalRepository = (*repository.JournalRepository)(nil)
