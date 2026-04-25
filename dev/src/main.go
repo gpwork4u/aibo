@@ -133,8 +133,13 @@ func main() {
 	calendarSvc := service.NewCalendarService(entryRepo, gcalSvc, true)
 	calendarHandler := handler.NewCalendarHandler(calendarSvc)
 
+	// 初始化日記服務（F-028b：CRUD）
+	journalRepo := repository.NewJournalRepository(pool)
+	journalSvc := service.NewJournalService(journalRepo, entryRepo)
+	journalHandler := handler.NewJournalHandler(journalSvc)
+
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler)
+	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
