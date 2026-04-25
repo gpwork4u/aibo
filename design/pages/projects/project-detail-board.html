@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Project Detail · Board — Mock</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, 'PingFang TC', sans-serif; }
+    .col { background: hsl(240 4.8% 97%); border-radius: 8px; }
+    .col[data-drag-over="true"] { background: hsl(217 91% 95%); box-shadow: 0 0 0 2px hsl(217 91% 60%); }
+    .card { background: #fff; border-radius: 6px; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.06); padding: 10px 12px; }
+    .card[data-dragging="true"] { transform: rotate(2deg); box-shadow: 0 12px 24px -8px rgb(0 0 0 / 0.30), 0 0 0 2px hsl(217 91% 60% / 0.40); }
+    .badge { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border-radius: 9999px; font-size: 10px; font-weight: 500; border: 1px solid; }
+    .pri-low { background: hsl(240 4.8% 95.9%); color: hsl(240 5% 30%); border-color: hsl(240 5.9% 80%); }
+    .pri-normal { background: hsl(217 91% 95%); color: hsl(217 91% 30%); border-color: hsl(217 91% 75%); }
+    .pri-high { background: hsl(25 95% 94%); color: hsl(25 95% 30%); border-color: hsl(25 95% 70%); }
+    .pri-urgent { background: hsl(0 84% 95%); color: hsl(0 84% 35%); border-color: hsl(0 84% 70%); }
+    .drop-indicator { height: 3px; background: hsl(217 91% 55%); border-radius: 2px; margin: 4px 0; }
+  </style>
+</head>
+<body class="bg-[hsl(240,4.8%,98%)] text-[hsl(240,10%,4%)] min-h-screen">
+  <main data-testid="project-detail-page" class="mx-auto max-w-7xl px-6 py-6">
+
+    <!-- Header -->
+    <header data-testid="project-detail-header" class="mb-4 flex items-center gap-3">
+      <span aria-hidden="true" class="h-6 w-1.5 rounded-full" style="background: #3b82f6"></span>
+      <div class="flex-1">
+        <nav class="text-xs text-[hsl(240,4%,45%)]"><a href="#" class="hover:underline">專案</a> / aibo v2</nav>
+        <h1 data-testid="project-detail-header-name" class="text-xl font-semibold">aibo v2</h1>
+      </div>
+      <button data-testid="project-detail-header-edit" class="inline-flex h-9 items-center gap-1 rounded border bg-white px-3 text-sm hover:bg-[hsl(240,4.8%,95.9%)]">編輯</button>
+      <button data-testid="project-detail-new-task" class="inline-flex h-9 items-center gap-1.5 rounded bg-[hsl(217,91%,50%)] px-3 text-sm font-medium text-white">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        新增任務
+      </button>
+    </header>
+
+    <!-- Tabs -->
+    <div role="tablist" data-testid="project-detail-tabs" class="mb-5 inline-flex rounded-md border bg-white p-1">
+      <button role="tab" aria-selected="true" data-testid="project-detail-tab-board" class="rounded px-4 py-1.5 text-sm font-medium bg-[hsl(240,4.8%,95.9%)]">看板</button>
+      <button role="tab" aria-selected="false" data-testid="project-detail-tab-list" class="rounded px-4 py-1.5 text-sm text-[hsl(240,4%,45%)]">列表</button>
+      <button role="tab" aria-selected="false" data-testid="project-detail-tab-overview" class="rounded px-4 py-1.5 text-sm text-[hsl(240,4%,45%)]">總覽</button>
+    </div>
+
+    <!-- Kanban Board -->
+    <section data-testid="kanban-board" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+
+      <!-- TODO column -->
+      <div role="list" data-testid="kanban-column-todo" class="col p-3" aria-label="待辦">
+        <header class="mb-2 flex items-center justify-between px-1">
+          <h2 class="flex items-center gap-1.5 text-sm font-semibold text-[hsl(240,5%,25%)]">
+            <span aria-hidden="true" class="h-2 w-2 rounded-full" style="background: hsl(240 5% 60%)"></span>
+            待辦
+            <span class="rounded bg-white px-1.5 text-[10px] tabular-nums">3</span>
+          </h2>
+          <button class="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-white" aria-label="在待辦欄新增任務">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </header>
+        <ul class="space-y-2">
+          <li data-testid="kanban-card-t1" class="card">
+            <p class="text-sm font-medium">設計 schema</p>
+            <div class="mt-1.5 flex items-center gap-1.5 text-xs text-[hsl(240,4%,45%)]">
+              <span class="badge pri-high">高</span>
+              <span class="ml-auto">4/30</span>
+            </div>
+          </li>
+          <li data-testid="kanban-card-t2" class="card">
+            <p class="text-sm font-medium">研究 dnd-kit 鍵盤導航</p>
+            <div class="mt-1.5 flex items-center gap-1.5 text-xs text-[hsl(240,4%,45%)]">
+              <span class="badge pri-normal">一般</span>
+              <span class="ml-auto">5/02</span>
+            </div>
+          </li>
+          <li data-testid="kanban-card-t3" class="card">
+            <p class="text-sm font-medium">寫部落格：Atomic Habits 心得</p>
+            <div class="mt-1.5 flex items-center gap-1.5 text-xs text-[hsl(240,4%,45%)]">
+              <span class="badge pri-low">低</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- IN PROGRESS column with drag-over preview -->
+      <div role="list" data-testid="kanban-column-in_progress" data-drag-over="true" class="col p-3" aria-label="進行中（拖移至此）">
+        <header class="mb-2 flex items-center justify-between px-1">
+          <h2 class="flex items-center gap-1.5 text-sm font-semibold text-[hsl(240,5%,25%)]">
+            <span aria-hidden="true" class="h-2 w-2 rounded-full" style="background: hsl(217 91% 50%)"></span>
+            進行中
+            <span class="rounded bg-white px-1.5 text-[10px] tabular-nums">2</span>
+          </h2>
+        </header>
+        <ul class="space-y-2">
+          <li data-testid="kanban-card-t4" class="card">
+            <p class="text-sm font-medium">F-031 後端 API</p>
+            <div class="mt-1.5 flex items-center gap-1.5 text-xs text-[hsl(240,4%,45%)]">
+              <span class="badge pri-urgent">急迫</span>
+              <span class="ml-auto text-[hsl(0,84%,40%)] font-medium">逾期 1 天</span>
+            </div>
+          </li>
+          <!-- Drop indicator (拖曳預覽態) -->
+          <div data-testid="kanban-drop-indicator" class="drop-indicator" aria-hidden="true"></div>
+          <li data-testid="kanban-card-t5-dragging" class="card" data-dragging="true">
+            <p class="text-sm font-medium">F-032 前端 Kanban UI</p>
+            <div class="mt-1.5 flex items-center gap-1.5 text-xs text-[hsl(240,4%,45%)]">
+              <span class="badge pri-high">高</span>
+              <span class="ml-auto">5/05</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- BLOCKED column -->
+      <div role="list" data-testid="kanban-column-blocked" class="col p-3" aria-label="卡住">
+        <header class="mb-2 flex items-center justify-between px-1">
+          <h2 class="flex items-center gap-1.5 text-sm font-semibold text-[hsl(240,5%,25%)]">
+            <span aria-hidden="true" class="h-2 w-2 rounded-full" style="background: hsl(0 84% 55%)"></span>
+            卡住
+            <span class="rounded bg-white px-1.5 text-[10px] tabular-nums">1</span>
+          </h2>
+        </header>
+        <ul class="space-y-2">
+          <li data-testid="kanban-card-t6" class="card">
+            <p class="text-sm font-medium">等 design tokens 確認</p>
+            <div class="mt-1.5 flex items-center gap-1.5 text-xs text-[hsl(240,4%,45%)]">
+              <span class="badge pri-normal">一般</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- DONE column -->
+      <div role="list" data-testid="kanban-column-done" class="col p-3" aria-label="完成">
+        <header class="mb-2 flex items-center justify-between px-1">
+          <h2 class="flex items-center gap-1.5 text-sm font-semibold text-[hsl(240,5%,25%)]">
+            <span aria-hidden="true" class="h-2 w-2 rounded-full" style="background: hsl(142 76% 36%)"></span>
+            完成
+            <span class="rounded bg-white px-1.5 text-[10px] tabular-nums">12</span>
+          </h2>
+        </header>
+        <ul class="space-y-2">
+          <li data-testid="kanban-card-t7" class="card opacity-70">
+            <p class="text-sm font-medium line-through text-[hsl(240,4%,45%)]">建立 GitHub repo</p>
+          </li>
+          <li data-testid="kanban-card-t8" class="card opacity-70">
+            <p class="text-sm font-medium line-through text-[hsl(240,4%,45%)]">spec / tech survey</p>
+          </li>
+        </ul>
+      </div>
+
+    </section>
+
+    <!-- Screen reader instructions placeholder -->
+    <div class="sr-only" aria-live="polite" data-testid="kanban-sr-announcer">
+      可用 Tab 進入 task，按 Space 開始拖移，方向鍵移動，Enter 放下，Esc 取消。
+    </div>
+  </main>
+</body>
+</html>

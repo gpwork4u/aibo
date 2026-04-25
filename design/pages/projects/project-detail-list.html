@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Project Detail · List — Mock</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, 'PingFang TC', sans-serif; }
+    th { font-weight: 500; font-size: 12px; color: hsl(240 4% 45%); text-align: left; padding: 10px 12px; border-bottom: 1px solid hsl(240 5.9% 90%); }
+    td { padding: 12px; border-bottom: 1px solid hsl(240 5.9% 92%); font-size: 14px; vertical-align: middle; }
+    tr:hover td { background: hsl(240 4.8% 97%); }
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 500; border: 1px solid; }
+    .st-todo { background: hsl(240 4.8% 95.9%); color: hsl(240 5% 25%); border-color: hsl(240 5.9% 80%); }
+    .st-ip { background: hsl(217 91% 95%); color: hsl(217 91% 28%); border-color: hsl(217 91% 75%); }
+    .st-blocked { background: hsl(0 84% 95%); color: hsl(0 84% 35%); border-color: hsl(0 84% 70%); }
+    .st-done { background: hsl(142 60% 92%); color: hsl(142 76% 25%); border-color: hsl(142 60% 70%); }
+    .pri-low { background: hsl(240 4.8% 95.9%); color: hsl(240 5% 30%); border-color: hsl(240 5.9% 80%); }
+    .pri-normal { background: hsl(217 91% 95%); color: hsl(217 91% 30%); border-color: hsl(217 91% 75%); }
+    .pri-high { background: hsl(25 95% 94%); color: hsl(25 95% 30%); border-color: hsl(25 95% 70%); }
+    .pri-urgent { background: hsl(0 84% 95%); color: hsl(0 84% 35%); border-color: hsl(0 84% 70%); }
+    .ref { display: inline-flex; align-items: center; gap: 3px; padding: 1px 6px; border: 1px solid hsl(240 5.9% 88%); border-radius: 9999px; font-size: 10px; background: hsl(240 4.8% 97%); }
+    .ref-missing { border-style: dashed; border-color: hsl(0 84% 60% / 0.4); color: hsl(0 84% 40%); background: hsl(0 84% 97%); }
+  </style>
+</head>
+<body class="bg-[hsl(240,4.8%,98%)] text-[hsl(240,10%,4%)] min-h-screen">
+  <main data-testid="project-detail-page" class="mx-auto max-w-7xl px-6 py-6">
+    <!-- Header reused -->
+    <header data-testid="project-detail-header" class="mb-4 flex items-center gap-3">
+      <span aria-hidden="true" class="h-6 w-1.5 rounded-full" style="background: #3b82f6"></span>
+      <div class="flex-1">
+        <nav class="text-xs text-[hsl(240,4%,45%)]"><a href="#" class="hover:underline">專案</a> / aibo v2</nav>
+        <h1 data-testid="project-detail-header-name" class="text-xl font-semibold">aibo v2</h1>
+      </div>
+      <button data-testid="project-detail-header-edit" class="inline-flex h-9 items-center gap-1 rounded border bg-white px-3 text-sm hover:bg-[hsl(240,4.8%,95.9%)]">編輯</button>
+      <button data-testid="project-detail-new-task" class="inline-flex h-9 items-center gap-1.5 rounded bg-[hsl(217,91%,50%)] px-3 text-sm font-medium text-white">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        新增任務
+      </button>
+    </header>
+
+    <!-- Tabs -->
+    <div role="tablist" data-testid="project-detail-tabs" class="mb-5 inline-flex rounded-md border bg-white p-1">
+      <button role="tab" aria-selected="false" data-testid="project-detail-tab-board" class="rounded px-4 py-1.5 text-sm text-[hsl(240,4%,45%)]">看板</button>
+      <button role="tab" aria-selected="true" data-testid="project-detail-tab-list" class="rounded px-4 py-1.5 text-sm font-medium bg-[hsl(240,4.8%,95.9%)]">列表</button>
+      <button role="tab" aria-selected="false" data-testid="project-detail-tab-overview" class="rounded px-4 py-1.5 text-sm text-[hsl(240,4%,45%)]">總覽</button>
+    </div>
+
+    <!-- Filter / search bar -->
+    <div class="mb-3 flex items-center gap-2">
+      <div class="relative flex-1 max-w-sm">
+        <svg class="absolute left-2.5 top-1/2 -translate-y-1/2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input data-testid="task-list-search" type="search" placeholder="搜尋任務…" class="h-9 w-full rounded-md border bg-white pl-8 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(217,91%,50%)]" aria-label="搜尋任務"/>
+      </div>
+      <select data-testid="task-list-filter-status" class="h-9 rounded-md border bg-white px-3 text-sm" aria-label="狀態篩選">
+        <option>全部狀態</option><option>待辦</option><option>進行中</option><option>卡住</option><option>完成</option>
+      </select>
+      <select data-testid="task-list-filter-priority" class="h-9 rounded-md border bg-white px-3 text-sm" aria-label="優先級篩選">
+        <option>全部優先級</option><option>急迫</option><option>高</option><option>一般</option><option>低</option>
+      </select>
+    </div>
+
+    <!-- Table -->
+    <div data-testid="task-list-table" class="overflow-hidden rounded-lg border bg-white">
+      <table class="w-full">
+        <thead>
+          <tr>
+            <th style="width: 40%">標題</th>
+            <th style="width: 110px">狀態</th>
+            <th style="width: 90px">優先級</th>
+            <th style="width: 110px">截止</th>
+            <th>關聯</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-testid="task-list-row-t1">
+            <td>
+              <div class="flex items-center gap-2">
+                <input type="checkbox" data-testid="task-list-row-t1-check" aria-label="完成 設計 schema"/>
+                <span class="font-medium">設計 schema</span>
+              </div>
+            </td>
+            <td><span class="badge st-todo">待辦</span></td>
+            <td><span class="badge pri-high">高</span></td>
+            <td class="tabular-nums">4/30</td>
+            <td>
+              <span class="ref">📄 entry：技術選型</span>
+              <span class="ref">📅 4/29 規劃會議</span>
+            </td>
+          </tr>
+          <tr data-testid="task-list-row-t4">
+            <td>
+              <div class="flex items-center gap-2">
+                <input type="checkbox" aria-label="完成 F-031 後端 API"/>
+                <span class="font-medium">F-031 後端 API</span>
+              </div>
+            </td>
+            <td><span class="badge st-ip">進行中</span></td>
+            <td><span class="badge pri-urgent">急迫</span></td>
+            <td class="text-[hsl(0,84%,40%)] font-medium">逾期 1 天</td>
+            <td>
+              <span class="ref">📔 04-23 日記</span>
+              <span class="ref ref-missing">⚠ 來源已刪除</span>
+            </td>
+          </tr>
+          <tr data-testid="task-list-row-t6">
+            <td>
+              <div class="flex items-center gap-2">
+                <input type="checkbox" aria-label="完成 等 design tokens 確認"/>
+                <span class="font-medium">等 design tokens 確認</span>
+              </div>
+            </td>
+            <td><span class="badge st-blocked">卡住</span></td>
+            <td><span class="badge pri-normal">一般</span></td>
+            <td class="text-[hsl(240,4%,45%)]">—</td>
+            <td>—</td>
+          </tr>
+          <tr data-testid="task-list-row-t7" class="opacity-70">
+            <td>
+              <div class="flex items-center gap-2">
+                <input type="checkbox" checked aria-label="已完成 建立 GitHub repo"/>
+                <span class="font-medium line-through text-[hsl(240,4%,45%)]">建立 GitHub repo</span>
+              </div>
+            </td>
+            <td><span class="badge st-done">完成</span></td>
+            <td><span class="badge pri-low">低</span></td>
+            <td class="text-[hsl(240,4%,45%)]">4/20</td>
+            <td>—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="mt-3 text-xs text-[hsl(240,4%,45%)]" data-testid="task-list-footer">共 4 筆</p>
+  </main>
+</body>
+</html>
