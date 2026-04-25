@@ -69,6 +69,48 @@ export const PROJECTS_TESTIDS = {
   toastUpdated: "projects-toast-updated",
   toastDeleted: "projects-toast-deleted",
   toastArchived: "projects-toast-archived",
+  toastDragFailed: "project-toast-drag-failed",
+  toastTaskCompleted: "project-toast-task-completed",
+
+  // Detail page (F-032b)
+  detailPage: "project-detail-page",
+  detailHeader: "project-detail-header",
+  detailHeaderName: "project-detail-header-name",
+  detailHeaderEdit: "project-detail-header-edit",
+  detailNewTask: "project-detail-new-task",
+  detailLoading: "project-detail-loading",
+  detailError: "project-detail-error",
+  detailNotFound: "project-detail-not-found",
+  detailTabs: "project-detail-tabs",
+  detailTabBoard: "project-detail-tab-board",
+  detailTabList: "project-detail-tab-list",
+  detailTabOverview: "project-detail-tab-overview",
+  detailContentBoard: "project-detail-content-board",
+  detailContentList: "project-detail-content-list",
+  detailContentOverview: "project-detail-content-overview",
+
+  // Overview tab
+  overviewProgress: "project-overview-progress",
+  overviewProgressBar: "project-overview-progress-bar",
+  overviewStats: "project-overview-stats",
+  overviewStatTotal: "project-overview-stat-total",
+  overviewStatDone: "project-overview-stat-done",
+  overviewStatBlocked: "project-overview-stat-blocked",
+  overviewStatOverdue: "project-overview-stat-overdue",
+  overviewTimeline: "project-overview-timeline",
+  overviewDates: "project-overview-dates",
+  overviewDescription: "project-overview-description",
+  overviewActivity: "project-overview-activity",
+  overviewActivityItem: "project-overview-activity-item",
+
+  // Task list tab
+  taskListSearch: "task-list-search",
+  taskListFilterStatus: "task-list-filter-status",
+  taskListFilterPriority: "task-list-filter-priority",
+  taskListTable: "project-task-list-table",
+  taskListEmpty: "project-task-list-empty",
+  taskListRow: (id: string) => `task-list-row-${id}`,
+  taskListRowCheck: (id: string) => `task-list-row-${id}-check`,
 } as const;
 
 /** Project color palette（與 design/tokens/projects.json `project-color-palette` 對齊） */
