@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,12 +14,13 @@ import { ProjectOverviewTab } from "@/components/projects/project-overview-tab";
 import { ProjectTaskListTab } from "@/components/projects/project-task-list-tab";
 import { useProject } from "@/lib/hooks/use-projects";
 import {
+  tasksKey,
   useCompleteTask,
   useCreateTask,
   useProjectTasks,
   useUpdateTask,
 } from "@/lib/hooks/use-tasks";
-import type { Task } from "@/lib/api/tasks";
+import type { ListTasksResponse, Task } from "@/lib/api/tasks";
 import { PROJECTS_TESTIDS } from "@/lib/projects/testids";
 
 export default function ProjectDetailPage() {
@@ -26,6 +28,7 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const projectId = params?.id ?? "";
 
+  const queryClient = useQueryClient();
   const projectQ = useProject(projectId);
   const tasksQ = useProjectTasks(projectId);
   const updateMut = useUpdateTask(projectId);
@@ -65,6 +68,7 @@ export default function ProjectDetailPage() {
       taskId,
       toStatus,
       toIndex,
+      optimisticTasks,
     }: {
       taskId: string;
       fromStatus: KanbanBoardTask["status"];
@@ -72,17 +76,34 @@ export default function ProjectDetailPage() {
       toIndex: number;
       optimisticTasks: KanbanBoardTask[];
     }) => {
+      const key = tasksKey(projectId);
+      const snapshot = queryClient.getQueryData<ListTasksResponse>(key);
+      // 樂觀更新：把 optimisticTasks（已套用拖放結果）寫回快取，立刻反映在 UI
+      if (snapshot) {
+        const byId = new Map<string, KanbanBoardTask>();
+        for (const t of optimisticTasks) byId.set(t.id, t);
+        const next: Task[] = snapshot.data.map((t) => {
+          const o = byId.get(t.id);
+          if (!o) return t;
+          return { ...t, status: o.status, position: o.position };
+        });
+        queryClient.setQueryData<ListTasksResponse>(key, { ...snapshot, data: next });
+      }
       try {
         await updateMut.mutateAsync({
           id: taskId,
           input: { status: toStatus, position: toIndex },
         });
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "更新失敗");
+        // 失敗回滾到 snapshot
+        if (snapshot) queryClient.setQueryData(key, snapshot);
+        toast.error(err instanceof Error ? err.message : "更新失敗", {
+          id: PROJECTS_TESTIDS.toastDragFailed,
+        });
         throw err;
       }
     },
-    [updateMut],
+    [updateMut, queryClient, projectId],
   );
 
   const handleAddTask = React.useCallback(
