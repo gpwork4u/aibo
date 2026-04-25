@@ -44,6 +44,7 @@ export function AppSidebar({ inboxCount = 0, open, onClose }: AppSidebarProps) {
   const settings: NavItem[] = [
     { label: "API Key", href: "/settings/api-keys", icon: Key },
     { label: "LLM Provider", href: "/settings/llm-providers", icon: Bot },
+    { label: "Google Calendar", href: "/settings/gcal", icon: Calendar },
   ];
 
   return (
