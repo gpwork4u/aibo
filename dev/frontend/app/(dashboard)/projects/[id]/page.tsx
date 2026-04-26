@@ -171,7 +171,10 @@ export default function ProjectDetailPage() {
       className="container mx-auto space-y-4 p-6"
       data-testid={PROJECTS_TESTIDS.detailPage}
     >
-      <div className="flex items-center gap-3">
+      <div
+        className="flex flex-wrap items-center gap-3"
+        data-testid={PROJECTS_TESTIDS.detailHeader}
+      >
         <Button
           variant="ghost"
           size="sm"
@@ -180,7 +183,41 @@ export default function ProjectDetailPage() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-2xl font-semibold">{project.name}</h1>
+        <h1
+          className="text-2xl font-semibold"
+          data-testid={PROJECTS_TESTIDS.detailHeaderName}
+        >
+          {project.name}
+        </h1>
+        <span
+          data-testid={PROJECTS_TESTIDS.detailHeaderStatusBadge}
+          className="rounded-full border bg-muted/50 px-2 py-0.5 text-xs"
+        >
+          {project.status}
+        </span>
+        <div className="ml-auto flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid={PROJECTS_TESTIDS.detailHeaderEdit}
+          >
+            編輯
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid={PROJECTS_TESTIDS.detailHeaderArchive}
+          >
+            封存
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid={PROJECTS_TESTIDS.detailHeaderDelete}
+          >
+            刪除
+          </Button>
+        </div>
       </div>
 
       <Tabs defaultValue="board" className="w-full">

@@ -87,9 +87,10 @@ export function ProjectOverviewTab({
 
   return (
     <div
-      data-testid={PROJECTS_TESTIDS.detailContentOverview}
+      data-testid={PROJECTS_TESTIDS.overviewPanel}
       className="space-y-6 py-4"
     >
+    <div data-testid={PROJECTS_TESTIDS.detailContentOverview} className="contents">
       {/* Progress block */}
       <section
         data-testid={PROJECTS_TESTIDS.overviewProgress}
@@ -234,6 +235,7 @@ export function ProjectOverviewTab({
           尚無活動紀錄
         </p>
       </section>
+    </div>
     </div>
   );
 }
