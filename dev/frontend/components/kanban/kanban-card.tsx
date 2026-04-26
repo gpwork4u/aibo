@@ -81,8 +81,22 @@ export function KanbanCard({
       ref={isDragOverlay ? undefined : setNodeRef}
       style={style}
       data-testid={`${KANBAN_TESTIDS.card}-${task.id}`}
+      onClick={(e) => {
+        // 卡片整體點擊也視為開啟 sheet（除非點到 drag handle / checkbox / 內部按鈕）
+        const target = e.target as HTMLElement;
+        if (
+          target.closest(
+            `[data-testid="${KANBAN_TESTIDS.cardDragHandle}"],` +
+              `[data-testid="${KANBAN_TESTIDS.cardCompleteToggle}"],` +
+              `[data-testid="${KANBAN_TESTIDS.cardOpenSheet}"]`,
+          )
+        ) {
+          return;
+        }
+        onOpen();
+      }}
       className={cn(
-        "group relative rounded-md border bg-card shadow-sm transition-shadow",
+        "group relative cursor-pointer rounded-md border bg-card shadow-sm transition-shadow",
         "hover:shadow-md focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1",
         isDragging && "opacity-40",
         isDragOverlay && "rotate-[2deg] shadow-2xl ring-2 ring-blue-400",

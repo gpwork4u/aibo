@@ -86,6 +86,7 @@ export function TaskSheet({ taskId, projectId, open, onOpenChange }: TaskSheetPr
   const [dueDate, setDueDate] = React.useState("");
   const [refs, setRefs] = React.useState<TaskRef[]>([]);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [toastMarker, setToastMarker] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (taskQ.data) {
@@ -117,6 +118,7 @@ export function TaskSheet({ taskId, projectId, open, onOpenChange }: TaskSheetPr
         },
       });
       toast.success("已儲存");
+      setToastMarker("task-toast-saved");
       onOpenChange(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "儲存失敗");
@@ -128,6 +130,7 @@ export function TaskSheet({ taskId, projectId, open, onOpenChange }: TaskSheetPr
     try {
       await completeMut.mutateAsync(taskId);
       toast.success("任務已完成");
+      setToastMarker("task-toast-completed");
       onOpenChange(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "標記完成失敗");
@@ -139,6 +142,7 @@ export function TaskSheet({ taskId, projectId, open, onOpenChange }: TaskSheetPr
     try {
       await deleteMut.mutateAsync(taskId);
       toast.success("已刪除");
+      setToastMarker("task-toast-deleted");
       setConfirmDelete(false);
       onOpenChange(false);
     } catch (err) {
@@ -148,6 +152,13 @@ export function TaskSheet({ taskId, projectId, open, onOpenChange }: TaskSheetPr
 
   return (
     <>
+      {toastMarker && (
+        <span
+          aria-hidden="true"
+          className="sr-only"
+          data-testid={toastMarker}
+        />
+      )}
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
           side="right"
@@ -309,6 +320,7 @@ export function TaskSheet({ taskId, projectId, open, onOpenChange }: TaskSheetPr
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
+              data-testid={PROJECTS_TESTIDS.taskSheetDeleteConfirm}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               刪除
