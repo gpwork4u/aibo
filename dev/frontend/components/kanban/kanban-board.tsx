@@ -5,6 +5,7 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
+  MouseSensor,
   PointerSensor,
   closestCorners,
   useSensor,
@@ -74,6 +75,7 @@ export function KanbanBoard({
   const [liveMessage, setLiveMessage] = React.useState("");
 
   const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
