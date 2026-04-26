@@ -33,7 +33,7 @@ test.describe("UpcomingTasksWidget（F-032c）", () => {
   });
 
   test("Scenario: widget 顯示未來 7 天的 tasks", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 UpcomingTasksWidget 完成再啟用");
+    test.skip(false, "Wave 3 — 等 UpcomingTasksWidget 完成再啟用");
     // GIVEN 跨專案 3 個未來 7 天內的未完成 task
     const upcoming = [
       makeMockTask({
@@ -69,7 +69,7 @@ test.describe("UpcomingTasksWidget（F-032c）", () => {
   });
 
   test("Scenario: 沒有近期 task → 顯示空狀態", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 widget 空狀態完成再啟用");
+    test.skip(false, "Wave 3 — 等 widget 空狀態完成再啟用");
     // GIVEN upcoming = []
     await installTasksMock(page, { upcoming: [] });
 
@@ -81,7 +81,7 @@ test.describe("UpcomingTasksWidget（F-032c）", () => {
   });
 
   test("Scenario: 逾期 task → 顯示紅色 overdue badge", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等逾期紅標完成再啟用");
+    test.skip(false, "Wave 3 — 等逾期紅標完成再啟用");
     // GIVEN 一筆逾期 task（due_date < today）
     // 注意：widget 可能由 /upcoming 或合併 /overdue 來源；以 spec 為準
     const upcoming = [
@@ -116,7 +116,7 @@ test.describe("UpcomingTasksWidget（F-032c）", () => {
   test("Scenario: 點 widget item → 跳到 project + 開 task sheet", async ({
     page,
   }) => {
-    test.skip(true, "Wave 3 — 等 widget item 連結完成再啟用");
+    test.skip(false, "Wave 3 — 等 widget item 連結完成再啟用");
     const upcoming = [
       makeMockTask({
         id: "u1",
@@ -137,7 +137,7 @@ test.describe("UpcomingTasksWidget（F-032c）", () => {
   });
 
   test("Scenario: widget 至多顯示 5 筆", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 widget cap=5 完成再啟用");
+    test.skip(false, "Wave 3 — 等 widget cap=5 完成再啟用");
     const upcoming = Array.from({ length: 7 }, (_, i) =>
       makeMockTask({
         id: `u${i}`,

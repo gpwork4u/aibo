@@ -58,24 +58,43 @@ export function UpcomingTasksWidget({
           {items.map((t) => (
             <li
               key={t.id}
-              data-testid={PROJECTS_TESTIDS.upcomingWidgetItem(t.id)}
+              data-testid="upcoming-tasks-widget-item"
             >
-              <Link
-                href={`/projects/${t.project_id}#task-${t.id}`}
-                className="flex items-center justify-between gap-2 rounded px-1.5 py-1 hover:bg-muted/50"
+              <span
+                data-testid={`upcoming-tasks-widget-item-${t.id}`}
+                style={{ display: "contents" }}
               >
-                <span className="truncate">{t.title}</span>
-                <span
-                  className={cn(
-                    "shrink-0 text-xs",
-                    isOverdue(t.due_date)
-                      ? "text-destructive"
-                      : "text-muted-foreground",
-                  )}
+                <Link
+                  href={`/projects/${t.project_id}?task=${t.id}`}
+                  className="flex items-center justify-between gap-2 rounded px-1.5 py-1 hover:bg-muted/50"
                 >
-                  {t.due_date ?? "—"}
-                </span>
-              </Link>
+                  <span
+                    className="truncate"
+                    data-testid="upcoming-tasks-widget-item-title"
+                  >
+                    {t.title}
+                  </span>
+                  <span
+                    data-testid="upcoming-tasks-widget-item-due"
+                    className={cn(
+                      "shrink-0 text-xs",
+                      isOverdue(t.due_date)
+                        ? "text-destructive"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {t.due_date ?? "—"}
+                  </span>
+                  {isOverdue(t.due_date) && (
+                    <span
+                      data-testid="upcoming-tasks-widget-item-overdue-badge"
+                      className="shrink-0 rounded bg-destructive/10 px-1 text-[10px] font-medium text-destructive"
+                    >
+                      逾期
+                    </span>
+                  )}
+                </Link>
+              </span>
             </li>
           ))}
         </ul>

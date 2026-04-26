@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
@@ -32,15 +32,33 @@ import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
 import { DeleteProjectConfirmDialog } from "@/components/projects/delete-project-confirm-dialog";
 
 export default function ProjectDetailPage() {
+  return (
+    <React.Suspense fallback={<div className="p-6"><Skeleton className="h-96 w-full" /></div>}>
+      <ProjectDetailPageInner />
+    </React.Suspense>
+  );
+}
+
+function ProjectDetailPageInner() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const projectId = params?.id ?? "";
 
   const queryClient = useQueryClient();
-  const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
-  const [sheetOpen, setSheetOpen] = React.useState(false);
+  const searchParams = useSearchParams();
+  const queryTaskId = searchParams?.get("task") ?? null;
+  const [activeTaskId, setActiveTaskId] = React.useState<string | null>(queryTaskId);
+  const [sheetOpen, setSheetOpen] = React.useState<boolean>(!!queryTaskId);
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+
+  // 跨頁開 sheet：URL ?task= 變化時同步 state（例如從 UpcomingTasksWidget 切過來）
+  React.useEffect(() => {
+    if (queryTaskId) {
+      setActiveTaskId(queryTaskId);
+      setSheetOpen(true);
+    }
+  }, [queryTaskId]);
   const projectQ = useProject(projectId);
   const tasksQ = useProjectTasks(projectId);
   const updateMut = useUpdateTask(projectId);
@@ -171,6 +189,16 @@ export default function ProjectDetailPage() {
               : "載入專案失敗，請稍後重試"
           }
           onRetry={() => projectQ.refetch()}
+        />
+        {/* 仍渲染 TaskSheet：跨頁深連結 ?task=:id 進來時，即使 project 載入失敗也讓 sheet 開起來 */}
+        <TaskSheet
+          taskId={activeTaskId}
+          projectId={projectId}
+          open={sheetOpen}
+          onOpenChange={(o) => {
+            setSheetOpen(o);
+            if (!o) setActiveTaskId(null);
+          }}
         />
       </div>
     );
