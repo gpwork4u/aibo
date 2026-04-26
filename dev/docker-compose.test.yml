@@ -1,0 +1,62 @@
+# 隔離 e2e 測試環境
+#
+# 起一組獨立的 db / api / frontend，使用替代 port，避免污染 dev 環境。
+# - test-db: postgres on host:5433（ephemeral，tmpfs，每次啟動都是 fresh DB）
+# - test-api: backend on host:8081
+# - test-frontend: Next.js 標準 build 但 NEXT_PUBLIC_API_URL 指向 8081，host:3001
+#
+# 用法：
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml --profile test up -d
+#   （或用 Playwright globalSetup 自動處理）
+#
+# Note：本檔僅包含 test-* 服務，無 volume，data 全在 tmpfs，stop 即消失。
+
+services:
+  test-db:
+    profiles: ["test"]
+    build:
+      context: ../docker/postgres
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_DB: aibo_test
+      POSTGRES_USER: aibo
+      POSTGRES_PASSWORD: aibo_test_password
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+    tmpfs:
+      - /var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aibo -d aibo_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  test-api:
+    profiles: ["test"]
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://aibo:aibo_test_password@test-db:5432/aibo_test?sslmode=disable
+      SERVER_PORT: "8080"
+      AIBO_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    depends_on:
+      test-db:
+        condition: service_healthy
+    ports:
+      - "8081:8080"
+
+  test-frontend:
+    profiles: ["test"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8081
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - test-api
+    ports:
+      - "3001:3000"

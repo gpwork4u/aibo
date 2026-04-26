@@ -10,6 +10,9 @@ RUN --mount=type=cache,target=/root/.npm \
 FROM node:20-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# Allow API URL injection at build-time（NEXT_PUBLIC_* 必須在 build 階段固定）
+ARG NEXT_PUBLIC_API_URL=http://localhost:8080
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

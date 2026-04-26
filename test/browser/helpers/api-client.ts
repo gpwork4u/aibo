@@ -9,7 +9,9 @@
 
 import { APIRequestContext } from "@playwright/test";
 
-const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:8080";
+// 預設指向 docker-compose.test.yml 的隔離 test-api（port 8081，fresh DB）。
+// 若需打 dev 環境（dev-api 8080）請設 API_BASE_URL 環境變數。
+const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:8081";
 
 export class ApiClient {
   private apiKey: string;
@@ -36,6 +38,18 @@ export class ApiClient {
     request: APIRequestContext,
     name = "test-default"
   ): Promise<{ client: ApiClient; key: string; id: string }> {
+    // Sprint 11+：globalSetup 會 bootstrap 一次共用 key，存於 AIBO_E2E_API_KEY。
+    // 個別 test 直接拿這把 key 即可，不必再呼叫 POST /auth/api-keys（會被擋）。
+    const sharedKey = process.env.AIBO_E2E_API_KEY;
+    if (sharedKey) {
+      return {
+        client: new ApiClient(request, sharedKey),
+        key: sharedKey,
+        id: "shared",
+      };
+    }
+
+    // Legacy 路徑：fresh DB 時直接 bootstrap
     const resp = await request.post(`${API_BASE_URL}/api/v1/auth/api-keys`, {
       data: { name },
       headers: { "Content-Type": "application/json" },
