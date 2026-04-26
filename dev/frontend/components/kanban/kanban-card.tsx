@@ -91,7 +91,7 @@ export function KanbanCard({
     >
       <span
         aria-hidden="true"
-        data-testid={`${KANBAN_TESTIDS.cardStatusDot}-${task.id}`}
+        data-testid={KANBAN_TESTIDS.cardStatusDot}
         className={cn(
           "absolute inset-y-0 left-0 w-1 rounded-l-md",
           TASK_STATUS_DOT_CLASS[task.status],
@@ -103,7 +103,7 @@ export function KanbanCard({
           type="button"
           {...attributes}
           {...listeners}
-          data-testid={`${KANBAN_TESTIDS.cardDragHandle}-${task.id}`}
+          data-testid={KANBAN_TESTIDS.cardDragHandle}
           aria-label={`拖移任務「${task.title}」`}
           className={cn(
             "mt-0.5 flex h-6 w-6 shrink-0 cursor-grab touch-none items-center justify-center rounded text-muted-foreground",
@@ -117,7 +117,7 @@ export function KanbanCard({
         <Checkbox
           checked={isDone}
           onCheckedChange={() => onComplete()}
-          data-testid={`${KANBAN_TESTIDS.cardCompleteToggle}-${task.id}`}
+          data-testid={KANBAN_TESTIDS.cardCompleteToggle}
           aria-label={
             isDone ? `取消完成任務「${task.title}」` : `完成任務「${task.title}」`
           }
@@ -127,13 +127,13 @@ export function KanbanCard({
         <button
           type="button"
           onClick={onOpen}
-          data-testid={`${KANBAN_TESTIDS.cardOpenSheet}-${task.id}`}
+          data-testid={KANBAN_TESTIDS.cardOpenSheet}
           className="flex-1 text-left focus:outline-none"
           aria-label={`開啟任務「${task.title}」詳情`}
         >
           <div className="mb-1 flex items-start gap-2">
             <h4
-              data-testid={`${KANBAN_TESTIDS.cardTitle}-${task.id}`}
+              data-testid={KANBAN_TESTIDS.cardTitle}
               className={cn(
                 "line-clamp-2 flex-1 text-sm font-medium leading-snug",
                 isDone && "line-through text-muted-foreground",
@@ -143,7 +143,7 @@ export function KanbanCard({
             </h4>
             {task.priority !== "normal" && (
               <Badge
-                data-testid={`${KANBAN_TESTIDS.cardPriorityBadge}-${task.id}`}
+                data-testid={KANBAN_TESTIDS.cardPriorityBadge}
                 variant="outline"
                 className={cn(
                   "shrink-0 border text-[10px] leading-tight",
@@ -159,7 +159,7 @@ export function KanbanCard({
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             {dueDate && (
               <span
-                data-testid={`${KANBAN_TESTIDS.cardDueDate}-${task.id}`}
+                data-testid={KANBAN_TESTIDS.cardDueDate}
                 className={cn(
                   "flex items-center gap-1 tabular-nums",
                   isOverdue && "text-destructive font-medium",
@@ -178,7 +178,7 @@ export function KanbanCard({
             )}
             {task.refs_count > 0 && (
               <span
-                data-testid={`${KANBAN_TESTIDS.cardRefsCount}-${task.id}`}
+                data-testid={KANBAN_TESTIDS.cardRefsCount}
                 className="flex items-center gap-1"
                 aria-label={`${task.refs_count} 個關聯項目`}
               >
