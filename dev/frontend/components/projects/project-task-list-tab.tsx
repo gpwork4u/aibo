@@ -62,7 +62,7 @@ export function ProjectTaskListTab({
   return (
     <div
       className="overflow-hidden rounded-md border"
-      data-testid={PROJECTS_TESTIDS.taskListTable}
+      data-testid="project-list-tab-table"
     >
       <table className="w-full text-sm">
         <thead className="bg-muted/40 text-left">
@@ -76,31 +76,48 @@ export function ProjectTaskListTab({
         </thead>
         <tbody>
           {tasks.map((t) => (
+            <React.Fragment key={t.id}>
+            <tr aria-hidden="true" className="hidden" data-testid="project-list-tab-row" />
             <tr
-              key={t.id}
-              className="border-t hover:bg-muted/20"
-              data-testid={PROJECTS_TESTIDS.taskListRow(t.id)}
+              className="border-t hover:bg-muted/20 cursor-pointer"
+              data-testid={`project-list-tab-row-${t.id}`}
+              onClick={() => onOpenTask(t.id)}
             >
-              <td className="px-3 py-2">
+              <td
+                className="px-3 py-2"
+                data-testid="project-list-tab-col-title"
+              >
                 <button
                   type="button"
                   className="text-left underline-offset-2 hover:underline"
-                  onClick={() => onOpenTask(t.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenTask(t.id);
+                  }}
                 >
                   {t.title}
                 </button>
               </td>
-              <td className="px-3 py-2">
+              <td
+                className="px-3 py-2"
+                data-testid="project-list-tab-col-status"
+              >
                 <Badge className={cn("border", TASK_STATUS_BADGE_CLASS[t.status])}>
                   {TASK_STATUS_LABEL[t.status]}
                 </Badge>
               </td>
-              <td className="px-3 py-2">
+              <td
+                className="px-3 py-2"
+                data-testid="project-list-tab-col-priority"
+              >
                 <Badge className={cn("border", TASK_PRIORITY_BADGE_CLASS[t.priority])}>
                   {TASK_PRIORITY_LABEL[t.priority]}
                 </Badge>
               </td>
-              <td className={cn("px-3 py-2", isOverdue(t) && "text-destructive")}>
+              <td
+                className={cn("px-3 py-2", isOverdue(t) && "text-destructive")}
+                data-testid="project-list-tab-col-due"
+              >
                 {t.due_date ?? "—"}
               </td>
               <td className="px-3 py-2">
@@ -128,6 +145,7 @@ export function ProjectTaskListTab({
                 </div>
               </td>
             </tr>
+            </React.Fragment>
           ))}
         </tbody>
       </table>

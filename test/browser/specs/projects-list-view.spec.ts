@@ -36,7 +36,7 @@ test.describe("Projects — List tab 表格（F-032b）", () => {
   test("Scenario: List tab 顯示表格欄位（title / status / priority / due / refs）", async ({
     page,
   }) => {
-    test.skip(true, "Wave 3 — 等 List tab 表格完成再啟用");
+    test.skip(false, "Wave 3 — 等 List tab 表格完成再啟用");
     // GIVEN 專案內 2 個 tasks
     const tasks = {
       "task-a": makeMockTask({
@@ -67,12 +67,12 @@ test.describe("Projects — List tab 表格（F-032b）", () => {
     await expect(page.getByTestId(K.listRow)).toHaveCount(2);
     const rowA = page.getByTestId(K.listRowById("task-a"));
     await expect(rowA.getByTestId(K.listColTitle)).toContainText("設計 schema");
-    await expect(rowA.getByTestId(K.listColPriority)).toContainText(/high/i);
+    await expect(rowA.getByTestId(K.listColPriority)).toContainText(/high|高/i);
     await expect(rowA.getByTestId(K.listColDue)).toContainText("2026-04-30");
   });
 
   test("Scenario: 點 List tab 列 → 開啟 Task Sheet", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 row click → sheet 完成再啟用");
+    test.skip(false, "Wave 3 — 等 row click → sheet 完成再啟用");
     const tasks = {
       "task-a": makeMockTask({
         id: "task-a",
