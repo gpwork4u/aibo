@@ -25,11 +25,13 @@ export interface Project {
 export interface ProjectListItem {
   id: string;
   name: string;
+  description?: string | null;
   color: string;
   status: ProjectStatus;
   start_date: string | null;
   end_date: string | null;
   progress: number;
+  task_counts?: TaskCounts;
   created_at: string;
   updated_at: string;
 }

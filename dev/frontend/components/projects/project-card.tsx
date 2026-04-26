@@ -114,6 +114,14 @@ export function ProjectCard({ project, onEdit, onArchive, onDelete }: ProjectCar
 
         {/* Meta footer */}
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          {project.task_counts && (
+            <span data-testid={PROJECTS_TESTIDS.cardOpenTaskCount}>
+              未完成{" "}
+              {(project.task_counts.by_status.todo ?? 0) +
+                (project.task_counts.by_status.in_progress ?? 0) +
+                (project.task_counts.by_status.blocked ?? 0)}
+            </span>
+          )}
           {project.end_date && (
             <span data-testid={PROJECTS_TESTIDS.cardNextDue} className="truncate">
               至 {project.end_date}
