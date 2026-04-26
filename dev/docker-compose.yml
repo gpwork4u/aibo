@@ -36,14 +36,15 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* 必須在 build 階段固定（runtime env 設定會觸發 Next.js 14 standalone bug，造成 (dashboard) routes 全 404）
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
       NODE_ENV: production
     depends_on:
       - api
     ports:
       - "3000:3000"
-    restart: unless-stopped
 
 volumes:
   pgdata:
