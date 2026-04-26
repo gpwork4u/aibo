@@ -24,6 +24,7 @@ type NavItem = {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: number;
+  testId?: string;
 };
 
 interface AppSidebarProps {
@@ -36,18 +37,18 @@ export function AppSidebar({ inboxCount = 0, open, onClose }: AppSidebarProps) {
   const pathname = usePathname();
 
   const main: NavItem[] = [
-    { label: "Inbox", href: "/inbox", icon: Inbox, badge: inboxCount || undefined },
-    { label: "行事曆", href: "/calendar", icon: Calendar },
-    { label: "日記", href: "/journal", icon: BookOpen },
-    { label: "專案", href: "/projects", icon: KanbanSquare },
-    { label: "知識條目", href: "/entries", icon: FileText },
-    { label: "分類管理", href: "/categories", icon: FolderTree },
-    { label: "搜尋", href: "/search", icon: Search },
+    { label: "Inbox", href: "/inbox", icon: Inbox, badge: inboxCount || undefined, testId: "nav-inbox" },
+    { label: "行事曆", href: "/calendar", icon: Calendar, testId: "nav-calendar" },
+    { label: "日記", href: "/journal", icon: BookOpen, testId: "nav-journal" },
+    { label: "專案", href: "/projects", icon: KanbanSquare, testId: "nav-projects" },
+    { label: "知識條目", href: "/entries", icon: FileText, testId: "nav-entries" },
+    { label: "分類管理", href: "/categories", icon: FolderTree, testId: "nav-categories" },
+    { label: "搜尋", href: "/search", icon: Search, testId: "nav-search" },
   ];
   const settings: NavItem[] = [
-    { label: "API Key", href: "/settings/api-keys", icon: Key },
-    { label: "LLM Provider", href: "/settings/llm-providers", icon: Bot },
-    { label: "Google Calendar", href: "/settings/gcal", icon: Calendar },
+    { label: "API Key", href: "/settings/api-keys", icon: Key, testId: "nav-api-keys" },
+    { label: "LLM Provider", href: "/settings/llm-providers", icon: Bot, testId: "nav-llm-providers" },
+    { label: "Google Calendar", href: "/settings/gcal", icon: Calendar, testId: "nav-gcal" },
   ];
 
   return (
@@ -63,6 +64,7 @@ export function AppSidebar({ inboxCount = 0, open, onClose }: AppSidebarProps) {
       />
       <aside
         aria-label="主要導航"
+        data-testid="app-sidebar"
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-transform md:sticky md:top-0 md:h-screen md:translate-x-0",
           open ? "translate-x-0" : "-translate-x-full",
@@ -123,6 +125,7 @@ function NavGroup({
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
+                data-testid={item.testId}
                 className={cn(
                   "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors",
                   active
@@ -136,6 +139,7 @@ function NavGroup({
                   <Badge
                     variant="default"
                     aria-label={`${item.badge} 筆未分類條目`}
+                    data-testid="sidebar-inbox-badge"
                     className="h-5 px-2 text-xs"
                   >
                     {item.badge > 99 ? "99+" : item.badge}

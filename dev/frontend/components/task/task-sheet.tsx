@@ -34,6 +34,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { RefsPicker } from "@/components/task/refs-picker";
+import { RefsList } from "@/components/task/refs-list";
 import {
   useCompleteTask,
   useDeleteTask,
@@ -150,6 +151,46 @@ export function TaskSheet({ taskId, projectId, open, onOpenChange }: TaskSheetPr
     }
   };
 
+  /**
+   * 選取 ref 後立即 PATCH（不等使用者點儲存）。
+   */
+  const handleRefSelect = async (ref: TaskRef) => {
+    if (!taskId) return;
+    // Dedup
+    if (refs.some((r) => r.ref_type === ref.ref_type && r.ref_id === ref.ref_id)) return;
+    const nextRefs = [...refs, ref];
+    setRefs(nextRefs);
+    try {
+      await updateMut.mutateAsync({
+        id: taskId,
+        input: { refs: nextRefs },
+      });
+    } catch {
+      // Rollback on error
+      setRefs(refs);
+    }
+  };
+
+  /**
+   * 移除 ref 後立即 PATCH。
+   */
+  const handleRefRemove = async (target: TaskRef) => {
+    if (!taskId) return;
+    const nextRefs = refs.filter(
+      (r) => !(r.ref_type === target.ref_type && r.ref_id === target.ref_id),
+    );
+    setRefs(nextRefs);
+    try {
+      await updateMut.mutateAsync({
+        id: taskId,
+        input: { refs: nextRefs },
+      });
+    } catch {
+      // Rollback on error
+      setRefs(refs);
+    }
+  };
+
   return (
     <>
       {toastMarker && (
@@ -254,9 +295,17 @@ export function TaskSheet({ taskId, projectId, open, onOpenChange }: TaskSheetPr
                 />
               </div>
 
-              <div className="space-y-1" data-testid={PROJECTS_TESTIDS.taskSheetRefs}>
+              {/* Refs 區塊 */}
+              <div
+                className="space-y-2"
+                data-testid={PROJECTS_TESTIDS.taskSheetRefs}
+              >
                 <Label>關聯來源</Label>
-                <RefsPicker value={refs} onChange={setRefs} />
+                <RefsPicker
+                  value={refs}
+                  onSelect={handleRefSelect}
+                />
+                <RefsList refs={refs} onRemove={handleRefRemove} />
               </div>
             </div>
           )}

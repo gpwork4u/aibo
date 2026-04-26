@@ -155,12 +155,23 @@ test.describe("Task Sheet（F-032c）", () => {
   test("Scenario: RefsPicker — Entry tab 搜尋 → 選取 → 即時 PATCH refs", async ({
     page,
   }) => {
-    test.skip(true, "Wave 3 — 等 RefsPicker Entry 搜尋完成再啟用");
+    test.skip(false, "Wave 3 — 等 RefsPicker Entry 搜尋完成再啟用");
     const tasks = {
       [TASK_ID]: makeMockTask({ id: TASK_ID, project_id: PROJECT_ID, refs: [] }),
     };
     const recorder = { requests: [] as Array<{ url: string; method: string; body?: unknown }> };
     await installTasksMock(page, { tasks, recorder });
+    // Mock entries search API
+    await page.route("**/api/v1/entries**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          data: [{ id: "entry-e1", title: "Schema 設計", summary: "資料庫 schema 設計文件" }],
+          pagination: { page: 1, per_page: 20, total: 1, total_pages: 1 },
+        }),
+      });
+    });
     await page.goto(`/projects/${PROJECT_ID}`);
     await page.getByTestId(P.detailTabBoard).click();
     await page.getByTestId(K.taskCardById(TASK_ID)).click();
@@ -169,7 +180,6 @@ test.describe("Task Sheet（F-032c）", () => {
     await page.getByTestId(T.refsPicker).click();
     await page.getByTestId(T.refsPickerTabEntry).click();
     await page.getByTestId(T.refsPickerSearchInput).fill("schema");
-    // 預留：搜尋結果由 entries search API 提供，Wave 3 補 mock
     await page.getByTestId(T.refsPickerResultItemById("entry-e1")).click();
 
     // THEN 即時 PATCH refs + 下方 refs 區塊新增一筆
@@ -187,7 +197,7 @@ test.describe("Task Sheet（F-032c）", () => {
   });
 
   test("Scenario: RefsPicker — Journal tab 列出最近 90 天", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 RefsPicker Journal 完成再啟用");
+    test.skip(false, "Wave 3 — 等 RefsPicker Journal 完成再啟用");
     const tasks = {
       [TASK_ID]: makeMockTask({ id: TASK_ID, project_id: PROJECT_ID }),
     };
@@ -205,7 +215,7 @@ test.describe("Task Sheet（F-032c）", () => {
   });
 
   test("Scenario: RefsPicker — Gcal tab 選日期 → 列 events", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 RefsPicker Gcal 完成再啟用");
+    test.skip(false, "RefsPicker Gcal 已實作（#157）");
     const tasks = {
       [TASK_ID]: makeMockTask({ id: TASK_ID, project_id: PROJECT_ID }),
     };
@@ -224,7 +234,7 @@ test.describe("Task Sheet（F-032c）", () => {
   });
 
   test("Scenario: 移除 ref → PATCH refs 不含該項", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 ref 移除按鈕完成再啟用");
+    test.skip(false, "RefsList 移除按鈕已實作（#157）");
     const tasks = {
       [TASK_ID]: makeMockTask({
         id: TASK_ID,
@@ -256,7 +266,7 @@ test.describe("Task Sheet（F-032c）", () => {
   });
 
   test("Scenario: ref 對應資源已刪除 → 顯示「已刪除」badge", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 ref 失效顯示完成再啟用");
+    test.skip(false, "RefsList deleted badge 已實作（#157）");
     const tasks = {
       [TASK_ID]: makeMockTask({
         id: TASK_ID,

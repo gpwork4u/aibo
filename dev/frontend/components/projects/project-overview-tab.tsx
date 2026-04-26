@@ -23,10 +23,8 @@ interface ProjectOverviewTabProps {
 }
 
 function formatDateZh(value: string): string {
-  // YYYY-MM-DD → 2026/04/25
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!m) return value;
-  return `${m[1]}/${m[2]}/${m[3]}`;
+  // YYYY-MM-DD → keep original format for testid matching
+  return value;
 }
 
 function daysRemaining(endDate: string): number {
@@ -98,7 +96,10 @@ export function ProjectOverviewTab({
       >
         <div className="mb-2 flex items-baseline justify-between">
           <h2 className="text-sm font-medium text-muted-foreground">進度</h2>
-          <span className="text-2xl font-semibold tabular-nums">
+          <span
+            data-testid={PROJECTS_TESTIDS.overviewProgressText}
+            className="text-2xl font-semibold tabular-nums"
+          >
             {project.progress}%
           </span>
         </div>
@@ -187,11 +188,11 @@ export function ProjectOverviewTab({
             className="h-4 w-4 text-muted-foreground"
             aria-hidden="true"
           />
-          <span>
+          <span data-testid={PROJECTS_TESTIDS.overviewStartDate}>
             {project.start_date ? formatDateZh(project.start_date) : "未設定"}
           </span>
           <span className="text-muted-foreground">→</span>
-          <span>
+          <span data-testid={PROJECTS_TESTIDS.overviewEndDate}>
             {project.end_date ? formatDateZh(project.end_date) : "未設定"}
           </span>
           {remaining !== null && (

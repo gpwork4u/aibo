@@ -10,6 +10,10 @@ export interface TaskRef {
   ref_type: "entry" | "journal" | "gcal_event";
   ref_id: string;
   exists?: boolean;
+  /** Whether the linked resource has been deleted (shown as badge in UI) */
+  deleted?: boolean;
+  /** Display title hydrated by backend */
+  title?: string;
 }
 
 export interface Task {
