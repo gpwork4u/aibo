@@ -29,7 +29,9 @@ export interface CalendarEventSummary {
 
 export interface CalendarJournal {
   id: string;
+  content?: string | null;
   mood?: string | null;
+  generated_by?: string | null;
 }
 
 export interface CalendarDay {

@@ -12,7 +12,7 @@ import (
 )
 
 // Setup 設定路由
-func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler, calendarHandler *handler.CalendarHandler, journalHandler *handler.JournalHandler, journalDraftHandler *handler.JournalDraftHandler, projectHandler *handler.ProjectHandler, taskHandler *handler.TaskHandler) *gin.Engine {
+func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler, calendarHandler *handler.CalendarHandler, journalHandler *handler.JournalHandler, journalDraftHandler *handler.JournalDraftHandler, journalAutoHandler *handler.JournalAutoHandler, projectHandler *handler.ProjectHandler, taskHandler *handler.TaskHandler) *gin.Engine {
 	r := gin.Default()
 
 	// CORS middleware — 允許跨網域（前端 localhost:3000 呼叫 API localhost:8080）
@@ -138,7 +138,7 @@ func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *
 			calendarGroup.GET("/days/:date", calendarHandler.GetDay)
 		}
 
-		// 每日日記（F-028b：CRUD；F-028c：LLM draft）
+		// 每日日記（F-028b：CRUD；F-028c：LLM draft；F-028d：自動生成）
 		journal := v1.Group("/journal")
 		{
 			journal.GET("", journalHandler.List)
@@ -148,6 +148,8 @@ func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *
 			journal.DELETE("/:date", journalHandler.Delete)
 			// F-028c：LLM 草稿（不直接寫入 DB；前端拿 draft 編輯後再 PATCH）
 			journal.POST("/:date/draft", journalDraftHandler.Draft)
+			// F-028d：idempotent get-or-create（自動生成並落地 DB）
+			journal.POST("/:date/auto", journalAutoHandler.AutoGenerate)
 		}
 
 		// 專案（F-031b：CRUD + archive + force delete）

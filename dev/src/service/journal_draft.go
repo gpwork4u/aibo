@@ -248,22 +248,23 @@ func (s *JournalDraftService) buildPrompt(date string, entries []dto.CalendarEnt
 	return full
 }
 
-const journalDraftSystemPrompt = `你是一位日記寫作助手。
+const journalDraftSystemPrompt = `你是一位日記整理助手。
 
-我會給你某一天的「知識條目」和「Google Calendar 事件」清單，請以第一人稱、自然敘述風格寫一篇 markdown 日記草稿，內容包含：
-1. 簡短開場（描述今天整體的方向 / 主軸）
-2. 重點回顧（依素材順序 1-3 段，每段帶一個小標題）
-3. 反思 / 想法（1-2 句）
+我會給你某一天的素材（可能包含「知識條目」、「Google Calendar 事件」、「GitHub 推送」、「LLM 對話紀錄」），
+請以**條列式 markdown** 整理成一篇日記，方便日後快速回顧。
 
-額外要求：
-- 不要直接列點呈現 entries / events，要融入敘述
-- 避免捏造未提供的細節
-- 引用素材時用內嵌字句，不要寫 "根據 entry XX..."
-- 如果素材很少，就寫得短一點，不要硬湊長度
+格式要求：
+- 用 ## 區塊標題分類（例如「## 知識條目」「## 行事曆」「## GitHub」「## LLM 對話」），只顯示有素材的區塊
+- 每個區塊用 bullet (- ) 條列；每條一句話精簡描述
+- 條目可附帶簡短重點 (- **標題** — 重點)；事件附時間
+- 結尾加「## 一日回顧」用 1-2 行白話摘要當日整體方向（例如「今天主要在處理 X，穿插討論 Y」）
+- 沒有素材的區塊就完全省略
+- 不要捏造未提供的細節
+- 不要寫「根據 entry XX」這種引用文字
 
 請以嚴格的 JSON 格式回應：
 {
-  "draft": "## 標題\n\n第一段內容...\n\n## 小標題\n\n內容...",
+  "draft": "## 知識條目\n- **A** — ...\n- **B** — ...\n\n## 行事曆\n- 09:00 開會\n\n## 一日回顧\n今天...",
   "used_refs": ["<entry_id_1>", "<gcal_id_1>"],
   "mood": "calm|energetic|focused|tired|reflective|（自由文字，可省略）"
 }

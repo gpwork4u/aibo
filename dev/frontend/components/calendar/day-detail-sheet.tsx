@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight, Loader2, PlusCircle } from "lucide-react";
+import { ArrowRight, Loader2, PlusCircle, Sparkles } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Sheet,
   SheetContent,
@@ -20,6 +21,8 @@ import type {
   CalendarEntrySummary,
   CalendarEventSummary,
 } from "@/lib/api/calendar";
+import { autoGenerateJournal } from "@/lib/api/journal-auto";
+import { ApiError } from "@/lib/api/client";
 
 interface DayDetailSheetProps {
   /** null/undefined 時 Sheet 關閉 */
@@ -86,6 +89,42 @@ export function DayDetailSheet({
   const day = data?.data;
   const entries: CalendarEntrySummary[] = day?.entries ?? [];
   const events: CalendarEventSummary[] = day?.events ?? [];
+
+  // Auto-generate journal：Sheet 開啟且當日有素材但無 journal → 自動呼叫
+  const queryClient = useQueryClient();
+  const [autoGenState, setAutoGenState] = React.useState<
+    "idle" | "loading" | "done" | "error"
+  >("idle");
+  const [autoGenError, setAutoGenError] = React.useState<string | null>(null);
+  const autoTriggerKeyRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    if (!date || !day) return;
+    if (day.journal && day.journal.content) return;
+    if (entries.length === 0 && events.length === 0) return;
+    const triggerKey = `${date}`;
+    if (autoTriggerKeyRef.current === triggerKey) return;
+    autoTriggerKeyRef.current = triggerKey;
+    setAutoGenState("loading");
+    setAutoGenError(null);
+    autoGenerateJournal(date, tz)
+      .then(() => {
+        setAutoGenState("done");
+        // 失效 calendar query → 重抓含 journal 的 day
+        queryClient.invalidateQueries({ queryKey: ["calendar"] });
+        queryClient.invalidateQueries({ queryKey: ["calendar-day", date] });
+      })
+      .catch((err: unknown) => {
+        setAutoGenState("error");
+        if (err instanceof ApiError) {
+          if (err.status === 424) setAutoGenError("尚未設定 LLM Provider");
+          else if (err.status === 404) setAutoGenError(null); // no content — silent
+          else setAutoGenError(err.message);
+        } else {
+          setAutoGenError(err instanceof Error ? err.message : "自動生成失敗");
+        }
+      });
+  }, [date, day, entries.length, events.length, tz, queryClient]);
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
@@ -256,29 +295,48 @@ export function DayDetailSheet({
 
           <Separator />
 
-          {/* Journal 區（F-028 實作） */}
+          {/* Journal 區：自動生成 */}
           <section
             aria-labelledby="section-journal"
             data-testid={CALENDAR_TESTIDS.sheetSectionJournal}
           >
             <h3
               id="section-journal"
-              className="text-sm font-semibold text-muted-foreground"
+              className="flex items-center gap-1.5 text-sm font-semibold text-muted-foreground"
             >
-              每日日記
+              <Sparkles className="h-3.5 w-3.5" />
+              每日整理
             </h3>
-            {day?.journal ? (
-              <div className="mt-2 rounded-md border bg-muted/40 px-3 py-2 text-sm">
-                <p className="text-muted-foreground">
-                  已有日記（id: {day.journal.id}）。檢視與編輯功能於 F-028 日記 feature 上線後可用。
+            {day?.journal && day.journal.content ? (
+              <div className="mt-2 rounded-md border bg-muted/40 px-3 py-3 text-sm">
+                {day.journal.generated_by && day.journal.generated_by !== "user" && (
+                  <Badge variant="secondary" className="mb-2 text-xs">
+                    LLM 自動生成
+                  </Badge>
+                )}
+                <article className="prose prose-sm max-w-none whitespace-pre-wrap text-foreground dark:prose-invert">
+                  {day.journal.content}
+                </article>
+                {day.journal.mood && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    心情：{day.journal.mood}
+                  </p>
+                )}
+              </div>
+            ) : autoGenState === "loading" ? (
+              <div className="mt-2 flex items-center gap-2 rounded-md border border-dashed px-3 py-6 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                正在用 LLM 整理今天的內容...
+              </div>
+            ) : autoGenError ? (
+              <div className="mt-2 rounded-md border border-dashed px-3 py-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  自動生成失敗：{autoGenError}
                 </p>
               </div>
-            ) : (
+            ) : entries.length === 0 && events.length === 0 ? (
               <div className="mt-2 rounded-md border border-dashed px-3 py-6 text-center">
-                <p className="text-sm text-muted-foreground">尚未建立日記</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  日記撰寫功能將於 F-028 上線
-                </p>
+                <p className="text-sm text-muted-foreground">今天沒有素材可整理</p>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -286,8 +344,13 @@ export function DayDetailSheet({
                   disabled
                   data-testid={CALENDAR_TESTIDS.sheetWriteJournalButton}
                 >
-                  撰寫日記（即將推出）
+                  尚無內容
                 </Button>
+              </div>
+            ) : (
+              <div className="mt-2 flex items-center gap-2 rounded-md border border-dashed px-3 py-6 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                準備生成...
               </div>
             )}
           </section>

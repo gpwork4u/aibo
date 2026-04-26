@@ -36,11 +36,21 @@ type CalendarEventSummary struct {
 	Description   *string    `json:"description,omitempty"`
 }
 
+// CalendarJournal 行事曆單日日記摘要
+//
+// 嵌入在 CalendarDay.Journal 欄位；只帶 UI 所需最少資訊，
+// 完整內容透過 GET /api/v1/journal/:date 取得。
+type CalendarJournal struct {
+	ID          string  `json:"id"`
+	Content     string  `json:"content"`
+	Mood        *string `json:"mood,omitempty"`
+	GeneratedBy *string `json:"generated_by,omitempty"`
+}
+
 // CalendarDay 單日彙整
 //
 // 對應 spec §API Contract 的 response.days[*]。
-// HasJournal 目前於 F-026 尚未正式使用（journal 功能於後續 sprint 才會接入），
-// 先保留欄位供 F-026b 填值時使用。
+// Journal 欄位在有日記時填入，無日記時為 nil（omitempty）。
 type CalendarDay struct {
 	Date       string                 `json:"date"`
 	EntryCount int                    `json:"entry_count"`
@@ -48,6 +58,7 @@ type CalendarDay struct {
 	HasJournal bool                   `json:"has_journal"`
 	Entries    []CalendarEntrySummary `json:"entries"`
 	Events     []CalendarEventSummary `json:"events"`
+	Journal    *CalendarJournal       `json:"journal,omitempty"`
 }
 
 // ToEntryRequest POST /api/v1/calendar/events/:gcal_id/to-entry 的請求 body

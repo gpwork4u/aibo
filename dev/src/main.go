@@ -129,16 +129,19 @@ func main() {
 	lifecycleSvc := service.NewLifecycleService(entryRepo)
 	lifecycleHandler := handler.NewLifecycleHandler(lifecycleSvc)
 
-	// 初始化行事曆彙整服務（F-026b；gcal 5 分鐘 in-memory cache）
-	calendarSvc := service.NewCalendarService(entryRepo, gcalSvc, true)
+	// 初始化日記 repository（需在 CalendarService 之前，因為 CalendarService 需要它填充 journal 欄位）
+	journalRepo := repository.NewJournalRepository(pool)
+
+	// 初始化行事曆彙整服務（F-026b；gcal 5 分鐘 in-memory cache；傳入 journalRepo 填充 journal 欄位）
+	calendarSvc := service.NewCalendarService(entryRepo, gcalSvc, true, journalRepo)
 	calendarHandler := handler.NewCalendarHandler(calendarSvc)
 
 	// 初始化日記服務（F-028b：CRUD；F-028c：LLM draft）
-	journalRepo := repository.NewJournalRepository(pool)
 	journalSvc := service.NewJournalService(journalRepo, entryRepo)
 	journalHandler := handler.NewJournalHandler(journalSvc)
 	journalDraftSvc := service.NewJournalDraftService(llmSvc, entryRepo, gcalSvc)
 	journalDraftHandler := handler.NewJournalDraftHandler(journalDraftSvc)
+	journalAutoHandler := handler.NewJournalAutoHandler(journalSvc, journalDraftSvc)
 
 	// 初始化專案服務（F-031b：CRUD + archive + force delete）
 	projectRepo := repository.NewProjectRepository(pool)
@@ -151,7 +154,7 @@ func main() {
 	taskHandler := handler.NewTaskHandler(taskSvc, projectSvc)
 
 	// 設定路由
-	r := router.Setup(pool, apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, projectHandler, taskHandler)
+	r := router.Setup(pool, apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, journalAutoHandler, projectHandler, taskHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{

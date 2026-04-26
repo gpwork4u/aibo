@@ -48,9 +48,11 @@ type AggregateResult struct {
 //
 // 實作 F-026 spec：read-through 合併 entries + gcal events，不落 DB。
 // gcal events 採用 in-memory 5 分鐘快取；entries 每次打 DB。
+// journalRepo 為可選（nil 時跳過 journal 填充，HasJournal 永遠 false）。
 type CalendarService struct {
-	entryRepo EntryRepository
-	gcalSvc   *GcalService
+	entryRepo   EntryRepository
+	gcalSvc     *GcalService
+	journalRepo JournalRepository // optional；nil 表示不填 journal 欄位
 
 	// gcal events cache（key: sha1(calendarID+since+until)）
 	cacheMu      sync.Mutex
@@ -66,13 +68,18 @@ type gcalCacheEntry struct {
 // NewCalendarService 建立新的 CalendarService
 //
 // cacheEnabled=false 可關閉 in-memory cache（測試方便）。
-func NewCalendarService(entryRepo EntryRepository, gcalSvc *GcalService, cacheEnabled bool) *CalendarService {
-	return &CalendarService{
+// journalRepo 可傳 nil，此時 journal 欄位不填（HasJournal 永遠 false）。
+func NewCalendarService(entryRepo EntryRepository, gcalSvc *GcalService, cacheEnabled bool, journalRepo ...JournalRepository) *CalendarService {
+	svc := &CalendarService{
 		entryRepo:    entryRepo,
 		gcalSvc:      gcalSvc,
 		cache:        make(map[string]*gcalCacheEntry),
 		cacheEnabled: cacheEnabled,
 	}
+	if len(journalRepo) > 0 {
+		svc.journalRepo = journalRepo[0]
+	}
+	return svc
 }
 
 // Aggregate 依 since..until 彙整 entries + gcal events 為 CalendarResponse
@@ -169,7 +176,12 @@ func (s *CalendarService) Aggregate(ctx context.Context, req AggregateRequest) (
 		assignEventToDays(days, summary, view, loc)
 	}
 
-	// 6) 按 view 調整 entry 上限
+	// 6) 若有 journalRepo，批次撈出 since..until 之間有 journal 的日期並填入
+	if s.journalRepo != nil {
+		s.fillJournals(ctx, days, sinceLocal, untilLocal)
+	}
+
+	// 7) 按 view 調整 entry 上限
 	orderedDates := orderedDates(sinceLocal, untilLocal, loc)
 	outDays := make([]dto.CalendarDay, 0, len(orderedDates))
 	totalEntries, totalEvents := 0, 0
@@ -446,6 +458,42 @@ func assignEventToDays(
 		// 交集條件：event.Start <= dayEnd && event.End >= dayStart
 		if !ev.Start.After(dayEnd) && !ev.End.Before(dayStart) {
 			b.Events = append(b.Events, *ev)
+		}
+	}
+}
+
+// fillJournals 對 days bucket 中的每一天查詢 journal，有則填入 HasJournal + Journal 欄位。
+//
+// 採逐日查詢（每次呼叫 GetByDate），適合 since..until 範圍不大（月視圖 ≤ 31 天）。
+// 查詢失敗只 warn log，不影響整體回應。
+func (s *CalendarService) fillJournals(
+	ctx context.Context,
+	days map[string]*dto.CalendarDay,
+	sinceLocal, untilLocal time.Time,
+) {
+	for d := sinceLocal; !d.After(untilLocal); d = d.AddDate(0, 0, 1) {
+		dateKey := d.Format("2006-01-02")
+		bucket, ok := days[dateKey]
+		if !ok {
+			continue
+		}
+		// DB DATE 以 UTC 00:00:00 表示
+		dateUTC := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC)
+		j, _, err := s.journalRepo.GetByDate(ctx, dateUTC)
+		if err != nil {
+			slog.WarnContext(ctx, "calendar.fillJournals: GetByDate failed",
+				"date", dateKey, "error", err)
+			continue
+		}
+		if j == nil {
+			continue
+		}
+		bucket.HasJournal = true
+		bucket.Journal = &dto.CalendarJournal{
+			ID:          j.ID.String(),
+			Content:     j.Content,
+			Mood:        j.Mood,
+			GeneratedBy: j.GeneratedBy,
 		}
 	}
 }
