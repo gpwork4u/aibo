@@ -3,20 +3,13 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileText, FolderTree, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { FileText, FolderTree, Pencil, Plus, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorState } from "@/components/error-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -100,44 +93,37 @@ export default function CategoriesPage() {
     {
       id: "actions",
       header: "",
-      className: "w-[50px]",
+      className: "w-[120px]",
       accessor: (row) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="分類操作"
-              data-testid="category-actions"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              data-testid="edit-category-button"
-              onClick={() => setEditing(row)}
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              編輯
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => router.push(`/entries?category_id=${row.id}`)}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              查看條目
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              data-testid="delete-category-button"
-              onClick={() => setDeleting(row)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              刪除
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="編輯"
+            data-testid="edit-category-button"
+            onClick={() => setEditing(row)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="查看條目"
+            onClick={() => router.push(`/entries?category_id=${row.id}`)}
+          >
+            <FileText className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="刪除"
+            className="text-destructive hover:text-destructive"
+            data-testid="delete-category-button"
+            onClick={() => setDeleting(row)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       ),
     },
   ];
@@ -191,19 +177,9 @@ export default function CategoriesPage() {
           data={sorted}
           columns={columns}
           rowKey={(row) => row.id}
+          rowAttrs={(row) => ({ "data-testid": "category-row", "data-id": row.id })}
           pageSize={20}
         />
-      )}
-
-      {/* 補上 e2e 測試需要的 category-row anchor（DataTable 沒支援 row-level testid） */}
-      {sorted.length > 0 && (
-        <div className="sr-only">
-          {sorted.map((c) => (
-            <div key={c.id} data-testid="category-row" data-id={c.id}>
-              {c.name}
-            </div>
-          ))}
-        </div>
       )}
 
       <CategoryFormDialog open={createOpen} onOpenChange={setCreateOpen} />

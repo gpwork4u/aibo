@@ -75,8 +75,8 @@ test.describe("F-021 Layout / Bootstrap", () => {
     const stored = await getStoredKey(page);
     expect(stored).toBeFalsy();
 
-    // Toast 顯示「API Key 無效」
-    await expect(page.getByText(/API Key 無效|請重新設定/)).toBeVisible();
+    // Toast 顯示「API Key 無效」（多個 toast 累積時取第一個）
+    await expect(page.getByText(/API Key 無效|請重新設定/).first()).toBeVisible();
   });
 
   test("Scenario 4: Dashboard Layout 顯示 Sidebar + Header + Main", async ({
