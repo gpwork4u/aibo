@@ -96,10 +96,10 @@ export interface UseCalendarParams {
 export function useCalendar(params: UseCalendarParams) {
   const { connected, setConnected } = useGcalConnectedCache();
   // 若 includeGcal 未指定：
-  //   連接狀態未知 → true
-  //   已知未連 → false
+  //   已知已連 → true
+  //   其他（未知或已知未連）→ false（避免打 gcal 引發 424/degraded）
   const effectiveIncludeGcal =
-    params.includeGcal !== undefined ? params.includeGcal : connected === false ? false : true;
+    params.includeGcal !== undefined ? params.includeGcal : connected === true ? true : false;
 
   const query = useQuery<FetchCalendarResult>({
     queryKey: calendarKey(params.since, params.until, params.view, effectiveIncludeGcal),
@@ -125,7 +125,7 @@ export function useCalendar(params: UseCalendarParams) {
 
   return {
     ...query,
-    gcalConnected: query.data?.gcalConnected ?? connected ?? true,
+    gcalConnected: query.data?.gcalConnected ?? connected ?? null,
     degraded: query.data?.degraded ?? null,
   };
 }

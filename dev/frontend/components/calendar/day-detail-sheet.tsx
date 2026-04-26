@@ -70,7 +70,7 @@ export function DayDetailSheet({
   date,
   tz,
   onClose,
-  includeGcal = true,
+  includeGcal = false,
 }: DayDetailSheetProps) {
   const open = !!date;
   const { data, isLoading, isError, error } = useCalendarDay(date, {
@@ -99,7 +99,7 @@ export function DayDetailSheet({
         <SheetHeader>
           <SheetTitle>{date ? formatDateLabel(date) : "單日詳情"}</SheetTitle>
           <SheetDescription>
-            查看當日新增的條目、Google Calendar 事件與日記。
+            查看當日新增的條目與 Google Calendar 事件。
           </SheetDescription>
         </SheetHeader>
 

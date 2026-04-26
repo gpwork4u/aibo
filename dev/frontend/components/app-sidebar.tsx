@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BookOpen,
   Bot,
   Calendar,
   FileText,
@@ -39,7 +38,6 @@ export function AppSidebar({ inboxCount = 0, open, onClose }: AppSidebarProps) {
   const main: NavItem[] = [
     { label: "Inbox", href: "/inbox", icon: Inbox, badge: inboxCount || undefined, testId: "nav-inbox" },
     { label: "行事曆", href: "/calendar", icon: Calendar, testId: "nav-calendar" },
-    { label: "日記", href: "/journal", icon: BookOpen, testId: "nav-journal" },
     { label: "專案", href: "/projects", icon: KanbanSquare, testId: "nav-projects" },
     { label: "知識條目", href: "/entries", icon: FileText, testId: "nav-entries" },
     { label: "分類管理", href: "/categories", icon: FolderTree, testId: "nav-categories" },

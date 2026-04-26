@@ -3,13 +3,11 @@
 import * as React from "react";
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { MonthView } from "@/components/calendar/month-view";
 import { WeekView } from "@/components/calendar/week-view";
 import { DayView } from "@/components/calendar/day-view";
-import { GcalBanner } from "@/components/calendar/gcal-banner";
 import { DayDetailSheet } from "@/components/calendar/day-detail-sheet";
 import { ErrorState } from "@/components/error-state";
 import {
@@ -86,24 +84,12 @@ function CalendarPageInner() {
     return { sinceYmd: ymd, untilYmd: ymd };
   }, [view, anchorDate, tz]);
 
-  const { data, isLoading, isError, error, gcalConnected, degraded } = useCalendar({
+  const { data, isLoading, isError, error } = useCalendar({
     since: range.sinceYmd,
     until: range.untilYmd,
     view,
     tz,
   });
-
-  // X-Degraded: gcal → 顯示 sonner toast（每次 key 變化只提示一次）
-  const lastDegradedKeyRef = React.useRef<string | null>(null);
-  React.useEffect(() => {
-    if (!degraded) return;
-    const key = `${range.sinceYmd}-${range.untilYmd}-${view}`;
-    if (lastDegradedKeyRef.current === key) return;
-    lastDegradedKeyRef.current = key;
-    toast.warning("Google Calendar 暫時無法載入，僅顯示知識條目", {
-      id: CALENDAR_TESTIDS.gcalDegradedToast,
-    });
-  }, [degraded, range.sinceYmd, range.untilYmd, view]);
 
   // 資料 → map
   const daysMap = React.useMemo(() => {
@@ -216,8 +202,6 @@ function CalendarPageInner() {
         isLoading={isLoading}
       />
 
-      {gcalConnected === false && <GcalBanner mode="not-connected" />}
-      {degraded === "gcal" && <GcalBanner mode="degraded" />}
 
       {isError ? (
         <ErrorState
