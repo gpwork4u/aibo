@@ -174,10 +174,6 @@ func (h *GcalHandler) ListEventsExternal(c *gin.Context) {
 	}
 
 	items, err := h.gcalSvc.ListEventsWithLinks(c.Request.Context(), calendarID, since, until, includeRecurring)
-// GetStatus 查詢 Google Calendar 連線狀態（F-030b）
-// GET /api/v1/integrations/gcal/status
-func (h *GcalHandler) GetStatus(c *gin.Context) {
-	resp, err := h.gcalSvc.GetStatus(c.Request.Context())
 	if err != nil {
 		if appErr, ok := err.(*model.AppError); ok {
 			c.JSON(appErr.Status, dto.ErrorResponse{Code: appErr.Code, Message: appErr.Message})
@@ -192,6 +188,22 @@ func (h *GcalHandler) GetStatus(c *gin.Context) {
 		out = append(out, toGcalEventResponse(item.Event, item.LinkedEntryID))
 	}
 	c.JSON(http.StatusOK, dto.ListGcalEventsResponse{Events: out})
+}
+
+// GetStatus 查詢 Google Calendar 連線狀態（F-030b）
+// GET /api/v1/integrations/gcal/status
+func (h *GcalHandler) GetStatus(c *gin.Context) {
+	resp, err := h.gcalSvc.GetStatus(c.Request.Context())
+	if err != nil {
+		if appErr, ok := err.(*model.AppError); ok {
+			c.JSON(appErr.Status, dto.ErrorResponse{Code: appErr.Code, Message: appErr.Message})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Code: "INTERNAL_ERROR", Message: "伺服器內部錯誤"})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // toGcalEventResponse 把 *calendar.Event 轉成 API DTO。
@@ -228,7 +240,6 @@ func toGcalEventResponse(ev *calendar.Event, linkedEntryID uuid.UUID) dto.GcalEv
 		resp.LinkedEntryID = &v
 	}
 	return resp
-	c.JSON(http.StatusOK, resp)
 }
 
 // ListCalendars 列出可選 Google Calendar（F-030b）

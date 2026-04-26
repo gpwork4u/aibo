@@ -41,6 +41,11 @@ export function ProjectCard({ project, onEdit, onArchive, onDelete }: ProjectCar
 
   return (
     <div
+      data-testid={PROJECTS_TESTIDS.card}
+      data-project-id={project.id}
+      className="contents"
+    >
+    <div
       data-testid={PROJECTS_TESTIDS.cardById(project.id)}
       className={cn(
         "group relative flex overflow-hidden rounded-lg border bg-card transition-all",
@@ -170,6 +175,7 @@ export function ProjectCard({ project, onEdit, onArchive, onDelete }: ProjectCar
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+    </div>
     </div>
   );
 }

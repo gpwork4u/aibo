@@ -43,6 +43,8 @@ type GcalEventResponse struct {
 // ListGcalEventsResponse F-030c GET /events 回應包裝
 type ListGcalEventsResponse struct {
 	Events []GcalEventResponse `json:"events"`
+}
+
 // GcalStatusResponse Google Calendar 連線狀態回應（F-030b）
 //
 // 未連線時 `Connected=false`，其餘欄位省略（json omitempty）。

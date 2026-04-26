@@ -1,11 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Aibo Browser E2E Test 設定（Sprint 7）
+ * Aibo Browser E2E Test 設定（Sprint 7+ / Sprint 11 起加入隔離環境）
  *
  * 環境變數：
- * - BASE_URL: 前端 URL（預設 http://localhost:3000）
- * - API_BASE_URL: API URL（預設 http://localhost:8080）
+ * - BASE_URL: 前端 URL（預設 http://localhost:3001 — test-frontend 隔離環境）
+ * - API_BASE_URL: API URL（預設 http://localhost:8081 — test-api 隔離環境）
+ * - AIBO_E2E_SKIP_DOCKER=1：跳過 globalSetup 的 docker compose（外部已起好或要 reuse）
+ * - AIBO_E2E_KEEP=1：跑完不收環境，方便手動 debug
  */
 export default defineConfig({
   testDir: "./specs",
@@ -17,13 +19,15 @@ export default defineConfig({
   expect: {
     timeout: 10_000,
   },
+  globalSetup: require.resolve("./global-setup"),
+  globalTeardown: require.resolve("./global-teardown"),
   reporter: [
     ["html", { outputFolder: "../screenshots/report", open: "never" }],
     ["list"],
     ["json", { outputFile: "../reports/browser-results.json" }],
   ],
   use: {
-    baseURL: process.env.BASE_URL || "http://localhost:3000",
+    baseURL: process.env.BASE_URL || "http://localhost:3001",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
