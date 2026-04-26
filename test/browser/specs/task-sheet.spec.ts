@@ -48,7 +48,7 @@ test.describe("Task Sheet（F-032c）", () => {
   });
 
   test("Scenario: 點 Kanban task card → 開啟 Sheet", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 task card click → sheet 完成再啟用");
+    test.skip(false, "Wave 3 — 等 task card click → sheet 完成再啟用");
     const tasks = {
       [TASK_ID]: makeMockTask({
         id: TASK_ID,
@@ -69,7 +69,7 @@ test.describe("Task Sheet（F-032c）", () => {
   });
 
   test("Scenario: Sheet 編輯 title 儲存 → PATCH /tasks/:id", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 sheet save flow 完成再啟用");
+    test.skip(false, "Wave 3 — 等 sheet save flow 完成再啟用");
     const tasks = {
       [TASK_ID]: makeMockTask({
         id: TASK_ID,
@@ -100,7 +100,7 @@ test.describe("Task Sheet（F-032c）", () => {
   });
 
   test("Scenario: 完成按鈕 → POST /tasks/:id/complete", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 sheet 完成按鈕完成再啟用");
+    test.skip(false, "Wave 3 — 等 sheet 完成按鈕完成再啟用");
     const tasks = {
       [TASK_ID]: makeMockTask({
         id: TASK_ID,
@@ -126,7 +126,7 @@ test.describe("Task Sheet（F-032c）", () => {
   });
 
   test("Scenario: 刪除按鈕 → 二次確認 → DELETE", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 sheet 刪除二次確認完成再啟用");
+    test.skip(false, "Wave 3 — 等 sheet 刪除二次確認完成再啟用");
     const tasks = {
       [TASK_ID]: makeMockTask({
         id: TASK_ID,
