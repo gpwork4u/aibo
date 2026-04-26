@@ -1,18 +1,18 @@
 # Sprint 10 Test Report
 
-**日期**: 2026-04-26（Sprint 11 collation）
-**狀態**: 🟢 **PARTIAL PASSED — 24/32**（剩 8 個複雜流程 skip，獨立 issue 追蹤）
+**日期**: 2026-04-26（Sprint 11 collation；最終更新 by PR #158）
+**狀態**: 🟢 **ALL TESTS PASSED — 31/32**（剩 1 個 keyboard drag NICE TO HAVE skip）
 
 ## Summary
 
 | Category | Count | Status |
 |---|---|---|
 | 總 sprint 10 e2e tests | 32 | — |
-| **PASSED** | **24** | ✅ |
-| SKIPPED (technical limitation) | 8 | ⏭️ |
+| **PASSED** | **31** | ✅ |
+| SKIPPED (NICE TO HAVE / dnd-kit limitation) | 1 | ⏭️ |
 | FAILED | 0 | — |
 
-從 Sprint 11 開始時的 **0/30 → 24/32（75%）**。
+從 Sprint 11 開始時的 **0/30 → 31/32（97%）**。剩 1 個 keyboard drag scenarios sortableKeyboardCoordinates 在單卡情境的限制，標 NICE TO HAVE。
 
 ## 分檔狀態
 
@@ -21,8 +21,8 @@
 | projects-list.spec.ts | 6 / 6 | ✅ |
 | projects-list-view.spec.ts | 2 / 2 | ✅ |
 | projects-detail-overview.spec.ts | 5 / 5 | ✅ |
-| projects-kanban.spec.ts | 2 / 5 | 🟡 3 drag tests skip |
-| task-sheet.spec.ts | 4 / 9 | 🟡 5 refs picker tests skip |
+| projects-kanban.spec.ts | 4 / 5 | ✅ 1 keyboard drag skip |
+| task-sheet.spec.ts | 9 / 9 | ✅ RefsPicker 全綠 |
 | upcoming-tasks.spec.ts | 5 / 5 | ✅ |
 
 ## 環境
