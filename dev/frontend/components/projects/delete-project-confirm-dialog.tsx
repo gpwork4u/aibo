@@ -50,7 +50,8 @@ export function DeleteProjectConfirmDialog({
 
   const hasTasks = taskCount !== undefined && taskCount > 0;
   const isLoadingCount = taskCount === undefined;
-  const canSubmit = !isLoadingCount && (!hasTasks || force) && !submitting;
+  // hasTasks 時，按下 force button 直接視為使用者確認（不再強制要求先勾 checkbox）。
+  const canSubmit = !isLoadingCount && !submitting;
 
   const handleConfirm = async () => {
     setSubmitting(true);
@@ -80,6 +81,10 @@ export function DeleteProjectConfirmDialog({
                 <Skeleton className="h-4 w-full" />
               ) : hasTasks ? (
                 <div
+                  data-testid={PROJECTS_TESTIDS.deleteDialogConfirmHasTasks}
+                  className="contents"
+                >
+                <div
                   data-testid={PROJECTS_TESTIDS.deleteDialogTaskWarning}
                   className="flex gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
                 >
@@ -97,6 +102,7 @@ export function DeleteProjectConfirmDialog({
                     </span>
                     筆任務，刪除將一併移除這些任務與其關聯資料，且無法復原。
                   </p>
+                </div>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">此操作無法復原。</p>

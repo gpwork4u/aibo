@@ -27,7 +27,7 @@ test.describe("Projects — 詳情頁 / Overview（F-032b）", () => {
   });
 
   test("Scenario: 進入 /projects/:id → 預設顯示 Board tab", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 ProjectDetailPage tabs 完成再啟用");
+    test.skip(false, "Wave 3 — 等 ProjectDetailPage tabs 完成再啟用");
     // GIVEN 既有專案
     const projects = {
       [PROJECT_ID]: makeMockProject({ id: PROJECT_ID, name: "aibo v2" }),
@@ -48,7 +48,7 @@ test.describe("Projects — 詳情頁 / Overview（F-032b）", () => {
   test("Scenario: 切換到 Overview tab → 顯示 description / progress / 時程", async ({
     page,
   }) => {
-    test.skip(true, "Wave 3 — 等 OverviewPanel 完成再啟用");
+    test.skip(false, "Wave 3 — 等 OverviewPanel 完成再啟用");
     // GIVEN 專案有 description / progress / start_date / end_date
     const projects = {
       [PROJECT_ID]: makeMockProject({
@@ -80,7 +80,7 @@ test.describe("Projects — 詳情頁 / Overview（F-032b）", () => {
   test("Scenario: header 顯示 name + status badge + edit/archive/delete 按鈕", async ({
     page,
   }) => {
-    test.skip(true, "Wave 3 — 等 detail header 完成再啟用");
+    test.skip(false, "Wave 3 — 等 detail header 完成再啟用");
     const projects = {
       [PROJECT_ID]: makeMockProject({ id: PROJECT_ID, name: "aibo v2" }),
     };
@@ -97,7 +97,7 @@ test.describe("Projects — 詳情頁 / Overview（F-032b）", () => {
   test("Scenario: 刪除有 task 的專案 → 409 → 二次確認 → force delete", async ({
     page,
   }) => {
-    test.skip(true, "Wave 3 — 等 delete force flow 完成再啟用");
+    test.skip(false, "Wave 3 — 等 delete force flow 完成再啟用");
     // GIVEN 專案有 tasks，DELETE 預設回 409
     const projects = {
       [PROJECT_ID]: makeMockProject({
@@ -129,7 +129,7 @@ test.describe("Projects — 詳情頁 / Overview（F-032b）", () => {
   test("Scenario: 點 archive → 呼叫 POST /:id/archive → status 變 archived", async ({
     page,
   }) => {
-    test.skip(true, "Wave 3 — 等 archive button 完成再啟用");
+    test.skip(false, "Wave 3 — 等 archive button 完成再啟用");
     const projects = {
       [PROJECT_ID]: makeMockProject({ id: PROJECT_ID, name: "aibo v2" }),
     };

@@ -13,7 +13,12 @@ import { KanbanBoard, type KanbanBoardTask } from "@/components/kanban/kanban-bo
 import { ProjectOverviewTab } from "@/components/projects/project-overview-tab";
 import { ProjectTaskListTab } from "@/components/projects/project-task-list-tab";
 import { TaskSheet } from "@/components/task/task-sheet";
-import { useProject } from "@/lib/hooks/use-projects";
+import {
+  useArchiveProject,
+  useDeleteProject,
+  useProject,
+  useUpdateProject,
+} from "@/lib/hooks/use-projects";
 import {
   tasksKey,
   useCompleteTask,
@@ -23,6 +28,8 @@ import {
 } from "@/lib/hooks/use-tasks";
 import type { ListTasksResponse, Task } from "@/lib/api/tasks";
 import { PROJECTS_TESTIDS } from "@/lib/projects/testids";
+import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
+import { DeleteProjectConfirmDialog } from "@/components/projects/delete-project-confirm-dialog";
 
 export default function ProjectDetailPage() {
   const params = useParams<{ id: string }>();
@@ -32,11 +39,16 @@ export default function ProjectDetailPage() {
   const queryClient = useQueryClient();
   const [activeTaskId, setActiveTaskId] = React.useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
   const projectQ = useProject(projectId);
   const tasksQ = useProjectTasks(projectId);
   const updateMut = useUpdateTask(projectId);
   const completeMut = useCompleteTask(projectId);
   const createMut = useCreateTask(projectId);
+  const updateProjectMut = useUpdateProject();
+  const archiveMut = useArchiveProject();
+  const deleteMut = useDeleteProject();
 
   const tasks = tasksQ.data?.data ?? [];
   const kanbanTasks: KanbanBoardTask[] = React.useMemo(
@@ -206,7 +218,16 @@ export default function ProjectDetailPage() {
           <Button
             variant="outline"
             size="sm"
+            disabled={archiveMut.isPending}
             data-testid={PROJECTS_TESTIDS.detailHeaderArchive}
+            onClick={async () => {
+              try {
+                await archiveMut.mutateAsync(project.id);
+                toast.success("已封存");
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "封存失敗");
+              }
+            }}
           >
             封存
           </Button>
@@ -214,6 +235,7 @@ export default function ProjectDetailPage() {
             variant="outline"
             size="sm"
             data-testid={PROJECTS_TESTIDS.detailHeaderDelete}
+            onClick={() => setDeleteOpen(true)}
           >
             刪除
           </Button>
@@ -271,6 +293,23 @@ export default function ProjectDetailPage() {
         onOpenChange={(o) => {
           setSheetOpen(o);
           if (!o) setActiveTaskId(null);
+        }}
+      />
+
+      <DeleteProjectConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        project={project}
+        taskCount={project.task_counts?.total}
+        onConfirm={async (force) => {
+          try {
+            await deleteMut.mutateAsync({ id: project.id, force });
+            router.push("/projects");
+            return { ok: true };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "刪除失敗";
+            return { ok: false, message: msg };
+          }
         }}
       />
     </div>
