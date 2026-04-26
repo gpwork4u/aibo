@@ -4,7 +4,7 @@
  * 對應 issue：#127（Wave 0 skeleton；Wave 3 補完整 assertion）
  * 對應 spec：specs/features/f032-projects-frontend.md
  *
- * Wave 0：所有 test 皆 test.skip(true, ...)。
+ * Wave 0：所有 test 皆 test.skip(false, ...)。
  */
 
 import { test, expect } from "@playwright/test";
@@ -27,7 +27,7 @@ test.describe("Projects — 列表頁（F-032a）", () => {
   });
 
   test("Scenario: 進入 /projects → 顯示卡片 grid", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 F-032a ProjectsListPage 完成再啟用");
+    test.skip(false, "Wave 3 — 等 F-032a ProjectsListPage 完成再啟用");
     // GIVEN 使用者有 2 個 active projects
     const projects = {
       p1: makeMockProject({ id: "p1", name: "aibo v2", progress: 30 }),
@@ -45,7 +45,7 @@ test.describe("Projects — 列表頁（F-032a）", () => {
   });
 
   test("Scenario: 列表為空 → 顯示空狀態 + 「建立第一個」CTA", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等空狀態 UI 完成再啟用");
+    test.skip(false, "Wave 3 — 等空狀態 UI 完成再啟用");
     // GIVEN 沒有任何 project
     await installProjectsMock(page, { projects: {}, list: [] });
 
@@ -60,7 +60,7 @@ test.describe("Projects — 列表頁（F-032a）", () => {
   test("Scenario: 點「新增」開啟 dialog → 填表 → 提交 → navigate /projects/:id", async ({
     page,
   }) => {
-    test.skip(true, "Wave 3 — 等 ProjectDialog + create flow 完成再啟用");
+    test.skip(false, "Wave 3 — 等 ProjectDialog + create flow 完成再啟用");
     // GIVEN /projects 列表頁
     const recorder = { requests: [] as Array<{ url: string; method: string; body?: unknown }> };
     await installProjectsMock(page, { recorder });
@@ -82,7 +82,7 @@ test.describe("Projects — 列表頁（F-032a）", () => {
   });
 
   test("Scenario: 重名 → name 欄位顯示「名稱已存在」", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 dialog 錯誤訊息處理完成再啟用");
+    test.skip(false, "Wave 3 — 等 dialog 錯誤訊息處理完成再啟用");
     // GIVEN API 回 409 PROJECT_NAME_DUPLICATE
     await installProjectsMock(page, { createConflict: true });
     await page.goto("/projects");
@@ -98,7 +98,7 @@ test.describe("Projects — 列表頁（F-032a）", () => {
   });
 
   test("Scenario: 切換 status tab → 套用正確 query", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 status tabs 篩選完成再啟用");
+    test.skip(false, "Wave 3 — 等 status tabs 篩選完成再啟用");
     // GIVEN 列表頁
     const recorder = { requests: [] as Array<{ url: string; method: string; body?: unknown }> };
     await installProjectsMock(page, { recorder });
@@ -118,7 +118,7 @@ test.describe("Projects — 列表頁（F-032a）", () => {
   test("Scenario: 卡片顯示 progress bar + 未完成 task 數 + 下一個 due", async ({
     page,
   }) => {
-    test.skip(true, "Wave 3 — 等卡片設計完成再啟用");
+    test.skip(false, "Wave 3 — 等卡片設計完成再啟用");
     // GIVEN 1 project，progress=50, open=3
     const projects = {
       p1: makeMockProject({
@@ -137,6 +137,6 @@ test.describe("Projects — 列表頁（F-032a）", () => {
     const card = page.getByTestId(P.listCardById("p1"));
     await expect(card.getByTestId(P.listCardProgressBar)).toBeVisible();
     await expect(card.getByTestId(P.listCardOpenTaskCount)).toBeVisible();
-    await expect(card.getByTestId(P.listCardStatusBadge)).toContainText(/active/i);
+    await expect(card.getByTestId(P.listCardStatusBadge)).toContainText(/active|進行中/i);
   });
 });
