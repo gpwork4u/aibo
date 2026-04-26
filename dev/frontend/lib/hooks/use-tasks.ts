@@ -72,9 +72,32 @@ export function useCompleteTask(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => completeTask(id),
-    onSettled: (_data, _err, id) => {
-      invalidateTaskQueries(qc, projectId);
-      if (id) qc.invalidateQueries({ queryKey: taskKey(id) });
+    // 樂觀更新：立即把目標 task 的 status 改為 done，避免依賴 mock GET 同步
+    onMutate: async (id) => {
+      const key = tasksKey(projectId);
+      await qc.cancelQueries({ queryKey: key });
+      const snapshot = qc.getQueryData<ListTasksResponse>(key);
+      if (snapshot) {
+        qc.setQueryData<ListTasksResponse>(key, {
+          ...snapshot,
+          data: snapshot.data.map((t) =>
+            t.id === id
+              ? { ...t, status: "done", completed_at: new Date().toISOString() }
+              : t,
+          ),
+        });
+      }
+      return { snapshot };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.snapshot) qc.setQueryData(tasksKey(projectId), ctx.snapshot);
+    },
+    onSuccess: (data, id) => {
+      // 保留樂觀更新；只 invalidate project（會更新 progress / counts）
+      qc.invalidateQueries({ queryKey: projectKey(projectId) });
+      qc.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: UPCOMING_TASKS_KEY });
+      if (id) qc.setQueryData(taskKey(id), data);
     },
   });
 }
