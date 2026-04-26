@@ -26,16 +26,16 @@ export const KANBAN_TESTIDS = {
   columnDropZone: "kanban-column-drop-zone",
   columnList: "kanban-column-list",
 
-  // Card
-  card: "kanban-card",
-  cardDragHandle: "kanban-card-drag-handle",
-  cardTitle: "kanban-card-title",
-  cardPriorityBadge: "kanban-card-priority",
-  cardStatusDot: "kanban-card-status-dot",
-  cardDueDate: "kanban-card-due-date",
-  cardRefsCount: "kanban-card-refs-count",
-  cardCompleteToggle: "kanban-card-complete-toggle",
-  cardOpenSheet: "kanban-card-open-sheet",
+  // Card（對齊 fixture：kanban-task-card-*）
+  card: "kanban-task-card",
+  cardDragHandle: "kanban-task-card-drag-handle",
+  cardTitle: "kanban-task-card-title",
+  cardPriorityBadge: "kanban-task-card-priority",
+  cardStatusDot: "kanban-task-card-status-dot",
+  cardDueDate: "kanban-task-card-due-date",
+  cardRefsCount: "kanban-task-card-refs-count",
+  cardCompleteToggle: "kanban-task-card-complete-button",
+  cardOpenSheet: "kanban-task-card-open-sheet",
 
   // Drag overlay
   dragOverlay: "kanban-drag-overlay",
