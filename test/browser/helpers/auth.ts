@@ -10,6 +10,8 @@
 import { Page, APIRequestContext } from "@playwright/test";
 import { ApiClient } from "./api-client";
 
+const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:8081";
+
 const LOCAL_STORAGE_KEY = "aibo_api_key";
 
 /**
@@ -65,4 +67,43 @@ export async function clearAuth(page: Page): Promise<void> {
  */
 export async function getStoredKey(page: Page): Promise<string | null> {
   return page.evaluate((k) => localStorage.getItem(k), LOCAL_STORAGE_KEY);
+}
+
+/**
+ * Reset DB 並 bootstrap 新的 session
+ *
+ * 用於需要 fresh DB 的 test（例如 f021 Scenario 1「無 API Key」場景）。
+ * 1. 呼叫 POST /api/v1/__test/reset（只在 AIBO_TEST_MODE=1 的 test-api 環境可用）
+ * 2. 清除 localStorage 認證
+ * 3. 不 bootstrap key（讓 test 自己控制是否要建立 key）
+ */
+export async function resetDbAndClearAuth(page: Page): Promise<void> {
+  // Reset DB（移除所有 api_keys + user data）
+  const res = await fetch(`${API_BASE_URL}/api/v1/__test/reset`, { method: "POST" });
+  if (!res.ok) {
+    throw new Error(`[resetDbAndClearAuth] DB reset 失敗：${res.status} ${await res.text()}`);
+  }
+  // 清除 localStorage
+  await clearAuth(page);
+  // 清除 AIBO_E2E_API_KEY 只對此 page context 的 initScript 重設
+  // （initScript 已在 createAuthenticatedSession 時注入，這裡透過 evaluate 移除）
+  await page.evaluate((k) => { try { localStorage.removeItem(k); } catch {} }, LOCAL_STORAGE_KEY);
+}
+
+/**
+ * Bootstrap 一把全新 API Key（DB reset 後使用）
+ * 直接呼叫 POST /auth/api-keys（不需認證）
+ */
+export async function bootstrapNewKey(name = `e2e-fresh-${Date.now()}`): Promise<string> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/api-keys`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    throw new Error(`[bootstrapNewKey] bootstrap 失敗：${res.status} ${await res.text()}`);
+  }
+  const body = await res.json() as { key: string };
+  if (!body.key) throw new Error("[bootstrapNewKey] bootstrap 沒返回 key");
+  return body.key;
 }

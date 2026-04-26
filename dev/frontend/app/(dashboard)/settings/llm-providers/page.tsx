@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import {
   Activity,
   Bot,
-  MoreHorizontal,
   Pencil,
   Plus,
   Star,
@@ -17,13 +16,6 @@ import { ErrorState } from "@/components/error-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -170,54 +162,49 @@ export default function LlmProvidersPage() {
     {
       id: "actions",
       header: "",
-      className: "w-[50px]",
+      className: "w-[160px]",
       accessor: (row) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="編輯"
+            data-testid="edit-provider-button"
+            onClick={() => setEditing(row)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          {!row.is_default && (
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Provider 操作"
-              data-testid="provider-actions"
+              aria-label="設為預設"
+              data-testid="set-default-button"
+              onClick={() => handleSetDefault(row)}
             >
-              <MoreHorizontal className="h-4 w-4" />
+              <Star className="h-4 w-4" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              data-testid="edit-provider-button"
-              onClick={() => setEditing(row)}
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              編輯
-            </DropdownMenuItem>
-            {!row.is_default && (
-              <DropdownMenuItem
-                data-testid="set-default-button"
-                onClick={() => handleSetDefault(row)}
-              >
-                <Star className="mr-2 h-4 w-4" />
-                設為預設
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem
-              data-testid="health-check-button"
-              onClick={() => handleHealthCheck(row)}
-            >
-              <Activity className="mr-2 h-4 w-4" />
-              健康檢查
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              data-testid="delete-provider-button"
-              onClick={() => setDeleting(row)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              刪除
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="健康檢查"
+            data-testid="health-check-button"
+            onClick={() => handleHealthCheck(row)}
+          >
+            <Activity className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="刪除"
+            className="text-destructive hover:text-destructive"
+            data-testid="delete-provider-button"
+            onClick={() => setDeleting(row)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       ),
     },
   ];
@@ -271,18 +258,9 @@ export default function LlmProvidersPage() {
           data={providers}
           columns={columns}
           rowKey={(row) => row.id}
+          rowAttrs={(row) => ({ "data-testid": "provider-row", "data-id": row.id })}
           pageSize={20}
         />
-      )}
-
-      {providers.length > 0 && (
-        <div className="sr-only">
-          {providers.map((p) => (
-            <div key={p.id} data-testid="provider-row" data-id={p.id}>
-              {p.name}
-            </div>
-          ))}
-        </div>
       )}
 
       <LlmProviderFormDialog open={createOpen} onOpenChange={setCreateOpen} />

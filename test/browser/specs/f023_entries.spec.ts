@@ -26,7 +26,7 @@ test.describe("F-023 Entries / Inbox", () => {
   test("Scenario 1+2: Inbox 空狀態顯示慶祝訊息", async ({ page }) => {
     await page.goto("/inbox");
     await expect(page.getByTestId("inbox-empty-state")).toBeVisible();
-    await expect(page.getByText(/太棒了|沒有待處理/)).toBeVisible();
+    await expect(page.getByText(/太棒了|沒有待處理/).first()).toBeVisible();
   });
 
   test("Scenario 1+8: 建立新 entry（只填 content）→ Inbox 列出", async ({ page }) => {
@@ -42,12 +42,14 @@ test.describe("F-023 Entries / Inbox", () => {
 
     await expect(dialog).not.toBeVisible();
 
-    // 列表應顯示 content_preview（灰斜體）
+    // 列表應顯示 content_preview（灰斜體在內層 span）
     const row = page.getByTestId("entry-row").first();
     await expect(row).toBeVisible();
     const preview = row.getByTestId("entry-title-or-preview");
-    await expect(preview).toHaveClass(/italic|text-muted/);
     await expect(preview).toContainText("這是一筆只有內容");
+    await expect(
+      preview.locator("span").filter({ hasText: "這是一筆只有內容" }),
+    ).toHaveClass(/italic|text-muted/);
   });
 
   test("Scenario 3: Entries 列表顯示 + summary/標題", async ({ page }) => {
@@ -131,8 +133,8 @@ test.describe("F-023 Entries / Inbox", () => {
     await page.goto("/inbox");
 
     const rows = page.getByTestId("entry-row");
+    await expect(rows).toHaveCount(3);
     const count = await rows.count();
-    expect(count).toBe(3);
     for (let i = 0; i < count; i++) {
       await expect(rows.nth(i)).toContainText("Inbox-Only");
     }

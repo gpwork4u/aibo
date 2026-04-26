@@ -147,6 +147,6 @@ test.describe("F-022 API Keys 管理", () => {
     await page.getByTestId("api-key-name-input").fill(name);
     await page.getByTestId("api-key-submit").click();
 
-    await expect(page.getByText(/名稱已存在|已經存在|duplicate/i)).toBeVisible();
+    await expect(page.getByText(/名稱已存在|已經存在|duplicate/i).first()).toBeVisible();
   });
 });

@@ -19,6 +19,7 @@ interface DataTableProps<T> {
   pageSize?: number;
   emptyText?: string;
   rowKey: (row: T, idx: number) => React.Key;
+  rowAttrs?: (row: T, idx: number) => Record<string, string>;
   className?: string;
 }
 
@@ -34,6 +35,7 @@ export function DataTable<T>({
   pageSize = 10,
   emptyText = "沒有資料",
   rowKey,
+  rowAttrs,
   className,
 }: DataTableProps<T>) {
   const [sortId, setSortId] = React.useState<string | null>(null);
@@ -131,6 +133,7 @@ export function DataTable<T>({
                 <tr
                   key={rowKey(row, idx)}
                   className="border-b transition-colors hover:bg-muted/50"
+                  {...(rowAttrs ? rowAttrs(row, idx) : {})}
                 >
                   {columns.map((col) => (
                     <td key={col.id} className={cn("p-3 align-middle", col.className)}>

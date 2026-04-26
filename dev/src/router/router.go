@@ -2,15 +2,17 @@ package router
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gpwork4u/aibo/handler"
 	"github.com/gpwork4u/aibo/middleware"
 	"github.com/gpwork4u/aibo/service"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Setup 設定路由
-func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler, calendarHandler *handler.CalendarHandler, journalHandler *handler.JournalHandler, journalDraftHandler *handler.JournalDraftHandler, projectHandler *handler.ProjectHandler, taskHandler *handler.TaskHandler) *gin.Engine {
+func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler, calendarHandler *handler.CalendarHandler, journalHandler *handler.JournalHandler, journalDraftHandler *handler.JournalDraftHandler, projectHandler *handler.ProjectHandler, taskHandler *handler.TaskHandler) *gin.Engine {
 	r := gin.Default()
 
 	// CORS middleware — 允許跨網域（前端 localhost:3000 呼叫 API localhost:8080）
@@ -20,6 +22,12 @@ func Setup(apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandle
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	// 測試用 DB reset（只在 AIBO_TEST_MODE=1 時啟用，不需認證）
+	if os.Getenv("AIBO_TEST_MODE") == "1" {
+		testResetHandler := handler.NewTestResetHandler(pool)
+		r.POST("/api/v1/__test/reset", testResetHandler.Reset)
+	}
 
 	// API v1 路由群組（需要認證）
 	v1 := r.Group("/api/v1")

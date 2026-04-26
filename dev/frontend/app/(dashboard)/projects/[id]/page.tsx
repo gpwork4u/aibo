@@ -51,6 +51,7 @@ function ProjectDetailPageInner() {
   const [sheetOpen, setSheetOpen] = React.useState<boolean>(!!queryTaskId);
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [dragFailed, setDragFailed] = React.useState(false);
 
   // 跨頁開 sheet：URL ?task= 變化時同步 state（例如從 UpcomingTasksWidget 切過來）
   React.useEffect(() => {
@@ -130,6 +131,7 @@ function ProjectDetailPageInner() {
       } catch (err) {
         // 失敗回滾到 snapshot
         if (snapshot) queryClient.setQueryData(key, snapshot);
+        setDragFailed(true);
         toast.error(err instanceof Error ? err.message : "更新失敗", {
           id: PROJECTS_TESTIDS.toastDragFailed,
         });
@@ -211,6 +213,14 @@ function ProjectDetailPageInner() {
       className="container mx-auto space-y-4 p-6"
       data-testid={PROJECTS_TESTIDS.detailPage}
     >
+      {/* Playwright testid marker for drag failure detection */}
+      {dragFailed && (
+        <span
+          aria-hidden="true"
+          className="sr-only"
+          data-testid="kanban-toast-drag-failed"
+        />
+      )}
       <div
         className="flex flex-wrap items-center gap-3"
         data-testid={PROJECTS_TESTIDS.detailHeader}

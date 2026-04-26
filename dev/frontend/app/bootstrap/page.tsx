@@ -74,7 +74,7 @@ export default function BootstrapPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center p-6">
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md" data-testid="bootstrap-welcome">
         <CardHeader>
           <CardTitle>歡迎使用 aibo</CardTitle>
           <CardDescription>
@@ -91,6 +91,7 @@ export default function BootstrapPage() {
                 id="name"
                 placeholder="例如：預設 API Key"
                 disabled={alreadyBootstrapped || form.formState.isSubmitting}
+                data-testid="bootstrap-name-input"
                 {...form.register("name")}
               />
               {form.formState.errors.name && (
@@ -119,6 +120,7 @@ export default function BootstrapPage() {
               type="submit"
               className="w-full"
               disabled={alreadyBootstrapped || form.formState.isSubmitting}
+              data-testid="bootstrap-submit"
             >
               {form.formState.isSubmitting && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -145,7 +147,7 @@ export default function BootstrapPage() {
               請妥善保管此 Key。為了安全考量，系統不會再次顯示。
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-md border bg-muted p-3 font-mono text-sm break-all">
+          <div className="rounded-md border bg-muted p-3 font-mono text-sm break-all" data-testid="bootstrap-created-key">
             {newKey}
           </div>
           <DialogFooter>
@@ -162,6 +164,7 @@ export default function BootstrapPage() {
               複製
             </Button>
             <Button
+              data-testid="bootstrap-continue"
               onClick={() => {
                 setNewKey(null);
                 router.replace("/inbox");

@@ -75,7 +75,7 @@ test.describe("F-024 Categories 管理", () => {
     await dialog.getByTestId("category-name-input").fill("mycategory");
     await dialog.getByTestId("category-submit").click();
 
-    await expect(page.getByText(/名稱已存在/)).toBeVisible();
+    await expect(page.getByText(/名稱已存在/).first()).toBeVisible();
   });
 
   test("Scenario 5: 刪除分類 AlertDialog + 顯示 entry 將移回 Inbox", async ({ page }) => {
