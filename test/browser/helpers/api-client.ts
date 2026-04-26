@@ -32,24 +32,32 @@ export class ApiClient {
   // ========== API Key ==========
 
   /**
-   * Bootstrap: 建立第一把 API Key（不需認證）
+   * Bootstrap: 建立第一把 API Key（不需認證），或直接使用共用 key
+   *
+   * 優先使用 AIBO_E2E_API_KEY（global-setup 設定的共用 key）。
+   * 若共用 key 已失效（DB reset 後），自動 fallback 到 bootstrap 流程。
    */
   static async bootstrap(
     request: APIRequestContext,
     name = "test-default"
   ): Promise<{ client: ApiClient; key: string; id: string }> {
-    // Sprint 11+：globalSetup 會 bootstrap 一次共用 key，存於 AIBO_E2E_API_KEY。
-    // 個別 test 直接拿這把 key 即可，不必再呼叫 POST /auth/api-keys（會被擋）。
     const sharedKey = process.env.AIBO_E2E_API_KEY;
     if (sharedKey) {
-      return {
-        client: new ApiClient(request, sharedKey),
-        key: sharedKey,
-        id: "shared",
-      };
+      // 驗證共用 key 是否仍有效
+      const checkResp = await request.get(`${API_BASE_URL}/api/v1/auth/api-keys`, {
+        headers: { "Content-Type": "application/json", "X-API-Key": sharedKey },
+      });
+      if (checkResp.status() === 200) {
+        return {
+          client: new ApiClient(request, sharedKey),
+          key: sharedKey,
+          id: "shared",
+        };
+      }
+      // 共用 key 失效（DB reset），fallback 到 bootstrap
     }
 
-    // Legacy 路徑：fresh DB 時直接 bootstrap
+    // fresh DB / DB reset 後：直接 bootstrap 第一把 key
     const resp = await request.post(`${API_BASE_URL}/api/v1/auth/api-keys`, {
       data: { name },
       headers: { "Content-Type": "application/json" },
@@ -184,6 +192,21 @@ export class ApiClient {
         headers: this.headers,
       }
     );
+  }
+
+  // ========== Test Reset ==========
+
+  /**
+   * 呼叫後端 __test/reset 端點，TRUNCATE 所有 user-data tables（包含 api_keys）。
+   * 只在 AIBO_TEST_MODE=1 的 test-api 環境可用。
+   * reset 後必須重新 bootstrap 一把 API key。
+   */
+  static async resetDb(): Promise<void> {
+    const url = `${API_BASE_URL}/api/v1/__test/reset`;
+    const res = await fetch(url, { method: "POST" });
+    if (!res.ok) {
+      throw new Error(`[resetDb] 失敗：${res.status} ${await res.text()}`);
+    }
   }
 
   // ========== Cleanup ==========

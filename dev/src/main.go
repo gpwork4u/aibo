@@ -151,7 +151,7 @@ func main() {
 	taskHandler := handler.NewTaskHandler(taskSvc, projectSvc)
 
 	// 設定路由
-	r := router.Setup(apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, projectHandler, taskHandler)
+	r := router.Setup(pool, apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, projectHandler, taskHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
