@@ -45,7 +45,7 @@ test.describe("Projects — Kanban Board（F-032b）", () => {
   test("Scenario: Board tab 顯示 4 欄（todo / in_progress / blocked / done）", async ({
     page,
   }) => {
-    test.skip(true, "Wave 3 — 等 KanbanBoard 完成再啟用");
+    test.skip(false, "Wave 3 — 等 KanbanBoard 完成再啟用");
     // GIVEN 專案有 tasks 散落在 4 個 status
     const tasks = {
       [TASK_T1]: makeMockTask({ id: TASK_T1, project_id: PROJECT_ID, status: "todo" }),
@@ -171,7 +171,7 @@ test.describe("Projects — Kanban Board（F-032b）", () => {
   });
 
   test("Scenario: 一鍵完成 → POST /complete → task 移到 done", async ({ page }) => {
-    test.skip(true, "Wave 3 — 等 task card 完成按鈕完成再啟用");
+    test.skip(false, "Wave 3 — 等 task card 完成按鈕完成再啟用");
     const tasks = {
       [TASK_T1]: makeMockTask({
         id: TASK_T1,
