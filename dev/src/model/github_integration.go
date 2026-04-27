@@ -17,6 +17,7 @@ type GitHubIntegration struct {
 	Scopes         []string   `json:"scopes"`
 	LastSyncedAt   *time.Time `json:"last_synced_at,omitempty"`
 	LastError      *string    `json:"last_error,omitempty"`
+	LastErrorAt    *time.Time `json:"last_error_at,omitempty"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
 }

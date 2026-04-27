@@ -19,6 +19,7 @@ CREATE TABLE github_integrations (
   scopes           TEXT[]       NOT NULL DEFAULT '{}',
   last_synced_at   TIMESTAMPTZ,
   last_error       TEXT,
+  last_error_at    TIMESTAMPTZ,
   created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );

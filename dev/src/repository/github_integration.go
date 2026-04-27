@@ -26,7 +26,7 @@ func (r *GitHubIntegrationRepository) Get(ctx context.Context) (*model.GitHubInt
 	integration := &model.GitHubIntegration{}
 	err := r.pool.QueryRow(ctx,
 		`SELECT id, username, token_encrypted, scopes,
-		        last_synced_at, last_error, created_at, updated_at
+		        last_synced_at, last_error, last_error_at, created_at, updated_at
 		 FROM github_integrations
 		 ORDER BY created_at DESC
 		 LIMIT 1`,
@@ -37,6 +37,7 @@ func (r *GitHubIntegrationRepository) Get(ctx context.Context) (*model.GitHubInt
 		&integration.Scopes,
 		&integration.LastSyncedAt,
 		&integration.LastError,
+		&integration.LastErrorAt,
 		&integration.CreatedAt,
 		&integration.UpdatedAt,
 	)
@@ -51,28 +52,53 @@ func (r *GitHubIntegrationRepository) Get(ctx context.Context) (*model.GitHubInt
 
 // Upsert 依 LOWER(username) 覆蓋更新（若存在則更新，否則插入）
 // 確保 DB 內永遠只有一筆同 username 的記錄
+// 採用 query-then-insert-or-update 策略，規避 ON CONFLICT expression 限制
 func (r *GitHubIntegrationRepository) Upsert(ctx context.Context, integration *model.GitHubIntegration) error {
 	if integration.ID == uuid.Nil {
 		integration.ID = uuid.New()
 	}
 
-	_, err := r.pool.Exec(ctx,
-		`INSERT INTO github_integrations
-		   (id, username, token_encrypted, scopes, last_synced_at, last_error, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-		 ON CONFLICT (LOWER(username))
-		 DO UPDATE SET
-		   token_encrypted = EXCLUDED.token_encrypted,
-		   scopes          = EXCLUDED.scopes,
-		   last_synced_at  = EXCLUDED.last_synced_at,
-		   last_error      = NULL,
-		   updated_at      = NOW()`,
-		integration.ID,
+	// 先查是否存在相同（case-insensitive）username
+	var existingID uuid.UUID
+	err := r.pool.QueryRow(ctx,
+		`SELECT id FROM github_integrations WHERE LOWER(username) = LOWER($1) LIMIT 1`,
 		integration.Username,
+	).Scan(&existingID)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		// 不存在 → INSERT
+		_, err = r.pool.Exec(ctx,
+			`INSERT INTO github_integrations
+			   (id, username, token_encrypted, scopes, last_synced_at, last_error, last_error_at, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+			integration.ID,
+			integration.Username,
+			integration.TokenEncrypted,
+			integration.Scopes,
+			integration.LastSyncedAt,
+			integration.LastError,
+			integration.LastErrorAt,
+		)
+		return err
+	}
+	if err != nil {
+		return err
+	}
+
+	// 存在 → UPDATE（清空 last_error / last_error_at）
+	_, err = r.pool.Exec(ctx,
+		`UPDATE github_integrations
+		 SET token_encrypted = $1,
+		     scopes          = $2,
+		     last_synced_at  = $3,
+		     last_error      = NULL,
+		     last_error_at   = NULL,
+		     updated_at      = NOW()
+		 WHERE id = $4`,
 		integration.TokenEncrypted,
 		integration.Scopes,
 		integration.LastSyncedAt,
-		integration.LastError,
+		existingID,
 	)
 	return err
 }
@@ -94,7 +120,7 @@ func (r *GitHubIntegrationRepository) Delete(ctx context.Context) error {
 func (r *GitHubIntegrationRepository) UpdateLastSyncedAt(ctx context.Context, id uuid.UUID) error {
 	_, err := r.pool.Exec(ctx,
 		`UPDATE github_integrations
-		 SET last_synced_at = NOW(), last_error = NULL, updated_at = NOW()
+		 SET last_synced_at = NOW(), last_error = NULL, last_error_at = NULL, updated_at = NOW()
 		 WHERE id = $1`,
 		id,
 	)
@@ -102,10 +128,11 @@ func (r *GitHubIntegrationRepository) UpdateLastSyncedAt(ctx context.Context, id
 }
 
 // UpdateLastError 記錄最後一次同步錯誤（供 sync job 使用）
+// 同步寫入 last_error_at = NOW()
 func (r *GitHubIntegrationRepository) UpdateLastError(ctx context.Context, id uuid.UUID, errMsg string) error {
 	_, err := r.pool.Exec(ctx,
 		`UPDATE github_integrations
-		 SET last_error = $1, updated_at = NOW()
+		 SET last_error = $1, last_error_at = NOW(), updated_at = NOW()
 		 WHERE id = $2`,
 		errMsg, id,
 	)

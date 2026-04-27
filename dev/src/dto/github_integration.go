@@ -8,38 +8,36 @@ type GitHubConnectRequest struct {
 	Token string `json:"token" binding:"required"`
 }
 
-// GitHubIntegrationDTO GitHub 整合資訊（不含 token 明文）
-type GitHubIntegrationDTO struct {
-	// Username GitHub 使用者名稱（由 GET /user API 回傳）
-	Username string `json:"username"`
-
-	// Scopes 此 PAT 擁有的 scope 清單（由 X-OAuth-Scopes header 解析）
-	Scopes []string `json:"scopes"`
-
-	// TokenSet 固定為 true，代表 token 已存在（不回傳明文）
-	TokenSet bool `json:"token_set"`
-
-	// LastSyncedAt 最後一次成功同步的時間
-	LastSyncedAt *time.Time `json:"last_synced_at,omitempty"`
-
-	// LastError 最後一次同步的錯誤訊息（無錯誤時省略）
-	LastError *string `json:"last_error,omitempty"`
-}
-
-// GitHubStatusResponse GET /api/v1/integrations/github/status 的回應 body
-type GitHubStatusResponse struct {
-	// Connected 是否已連接 GitHub
-	Connected bool `json:"connected"`
-
-	// Integration 連接資訊（connected=false 時為 nil）
-	Integration *GitHubIntegrationDTO `json:"integration,omitempty"`
-}
-
 // GitHubConnectResponse POST /api/v1/integrations/github/connect 的回應 body（201）
+// 扁平結構，符合 spec 要求
 type GitHubConnectResponse struct {
-	// Message 操作結果說明
-	Message string `json:"message"`
+	ID           string     `json:"id"`
+	Username     string     `json:"username"`
+	Scopes       []string   `json:"scopes"`
+	TokenSet     bool       `json:"token_set"`
+	LastSyncedAt *time.Time `json:"last_synced_at,omitempty"`
+	LastError    *string    `json:"last_error,omitempty"`
+	LastErrorAt  *time.Time `json:"last_error_at,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
 
-	// Integration 連接後的整合資訊
-	Integration GitHubIntegrationDTO `json:"integration"`
+// GitHubStatusConnectedResponse GET /api/v1/integrations/github/status 的回應 body（已連接）
+// 扁平結構，符合 spec 要求
+type GitHubStatusConnectedResponse struct {
+	Connected    bool       `json:"connected"`
+	ID           string     `json:"id"`
+	Username     string     `json:"username"`
+	Scopes       []string   `json:"scopes"`
+	TokenSet     bool       `json:"token_set"`
+	LastSyncedAt *time.Time `json:"last_synced_at,omitempty"`
+	LastError    *string    `json:"last_error,omitempty"`
+	LastErrorAt  *time.Time `json:"last_error_at,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+// GitHubStatusDisconnectedResponse GET /api/v1/integrations/github/status 的回應 body（未連接）
+type GitHubStatusDisconnectedResponse struct {
+	Connected bool `json:"connected"`
 }

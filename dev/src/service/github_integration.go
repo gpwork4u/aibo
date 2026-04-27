@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -14,6 +15,7 @@ import (
 	"github.com/gpwork4u/aibo/crypto"
 	"github.com/gpwork4u/aibo/model"
 	"github.com/gpwork4u/aibo/repository"
+	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -29,6 +31,9 @@ const (
 	// redactSuffixLen PAT redact 時保留的後段字元數
 	redactSuffixLen = 4
 )
+
+// requiredScopes 連接 GitHub 所需的最小 scope 集合
+var requiredScopes = []string{"repo", "read:user"}
 
 // GitHubIntegrationService GitHub PAT 整合業務邏輯
 type GitHubIntegrationService struct {
@@ -58,20 +63,19 @@ type githubUserResponse struct {
 
 // ConnectResult Connect() 成功時的回傳資料
 type ConnectResult struct {
-	Username string
-	Scopes   []string
+	Integration *model.GitHubIntegration
 }
 
 // Connect 驗證 PAT 並儲存整合設定
 //
 // 流程：
 //  1. 用 PAT 呼叫 GitHub GET /user 驗證有效性並取得 username
-//  2. 從 X-OAuth-Scopes header 解析 scopes
+//  2. 從 X-OAuth-Scopes header 解析 scopes，驗證是否包含 repo + read:user
 //  3. 加密 PAT 後 Upsert 到 DB
 //
 // 錯誤：
 //   - 401 → model.AppError{Code: ErrCodeGitHubTokenInvalid}
-//   - 403（scope 不足）→ model.AppError{Code: ErrCodeGitHubInsufficientScope}
+//   - 缺少必要 scope → model.AppError{Code: ErrCodeGitHubInsufficientScope}
 //   - GitHub 不可達 → model.AppError{Code: ErrCodeGitHubUnavailable}
 func (s *GitHubIntegrationService) Connect(ctx context.Context, pat string) (*ConnectResult, error) {
 	// 安全日誌：PAT 只印 redacted 版本
@@ -104,9 +108,14 @@ func (s *GitHubIntegrationService) Connect(ctx context.Context, pat string) (*Co
 		return nil, fmt.Errorf("儲存 GitHub 整合設定失敗: %w", err)
 	}
 
+	// 讀回 DB 中的完整記錄（取得 id / created_at / updated_at）
+	saved, err := s.repo.Get(ctx)
+	if err != nil || saved == nil {
+		return nil, fmt.Errorf("讀取已儲存的 GitHub 整合設定失敗: %w", err)
+	}
+
 	return &ConnectResult{
-		Username: user.Login,
-		Scopes:   scopes,
+		Integration: saved,
 	}, nil
 }
 
@@ -131,8 +140,7 @@ func (s *GitHubIntegrationService) GetStatus(ctx context.Context) (connected boo
 func (s *GitHubIntegrationService) Disconnect(ctx context.Context) error {
 	err := s.repo.Delete(ctx)
 	if err != nil {
-		// pgx.ErrNoRows 對應「尚未連接」
-		if err.Error() == "no rows in result set" {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return &model.AppError{
 				Status:  http.StatusNotFound,
 				Code:    model.ErrCodeGitHubNotConnected,
@@ -169,6 +177,7 @@ func (s *GitHubIntegrationService) DecryptToken(ctx context.Context) (string, er
 }
 
 // fetchGitHubUser 呼叫 GitHub GET /user，回傳使用者資訊與 scopes
+// 並驗證 X-OAuth-Scopes header 中是否含有必要的 scope
 func (s *GitHubIntegrationService) fetchGitHubUser(ctx context.Context, pat string) (*githubUserResponse, []string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, githubAPIBase+"/user", nil)
 	if err != nil {
@@ -201,13 +210,6 @@ func (s *GitHubIntegrationService) fetchGitHubUser(ctx context.Context, pat stri
 			Code:    model.ErrCodeGitHubTokenInvalid,
 			Message: "GitHub Personal Access Token 無效或已過期",
 		}
-	case http.StatusForbidden:
-		slog.Warn("GitHub PAT scope 不足", "status", resp.StatusCode, "token", redactToken(pat))
-		return nil, nil, &model.AppError{
-			Status:  http.StatusUnprocessableEntity,
-			Code:    model.ErrCodeGitHubInsufficientScope,
-			Message: "GitHub Personal Access Token 缺少必要的存取權限",
-		}
 	default:
 		slog.Error("GitHub API 回傳非預期狀態碼", "status", resp.StatusCode)
 		return nil, nil, &model.AppError{
@@ -218,7 +220,14 @@ func (s *GitHubIntegrationService) fetchGitHubUser(ctx context.Context, pat stri
 	}
 
 	// 解析 scopes（X-OAuth-Scopes: "repo, user, read:org"）
+	// 注意：GitHub GET /user 對任何有效 PAT 都回 200，scope 驗證必須看 header
 	scopes := parseScopes(resp.Header.Get("X-OAuth-Scopes"))
+
+	// 驗證必要 scopes
+	if err := validateRequiredScopes(scopes); err != nil {
+		slog.Warn("GitHub PAT scope 不足", "actual_scopes", scopes, "required", requiredScopes, "token", redactToken(pat))
+		return nil, nil, err
+	}
 
 	// 解析回應 body
 	body, err := io.ReadAll(resp.Body)
@@ -236,6 +245,29 @@ func (s *GitHubIntegrationService) fetchGitHubUser(ctx context.Context, pat stri
 	}
 
 	return &user, scopes, nil
+}
+
+// validateRequiredScopes 驗證 scopes 清單是否包含所有必要的 scope
+// 若缺少任何必要 scope，回傳 AppError{Code: ErrCodeGitHubInsufficientScope}
+func validateRequiredScopes(actual []string) error {
+	scopeSet := make(map[string]bool, len(actual))
+	for _, s := range actual {
+		scopeSet[s] = true
+	}
+	var missing []string
+	for _, required := range requiredScopes {
+		if !scopeSet[required] {
+			missing = append(missing, required)
+		}
+	}
+	if len(missing) > 0 {
+		return &model.AppError{
+			Status:  http.StatusUnprocessableEntity,
+			Code:    model.ErrCodeGitHubInsufficientScope,
+			Message: fmt.Sprintf("GitHub Personal Access Token 缺少必要的存取權限：%s", strings.Join(missing, ", ")),
+		}
+	}
+	return nil
 }
 
 // parseScopes 解析 X-OAuth-Scopes header 成字串陣列

@@ -22,11 +22,11 @@ func NewGitHubIntegrationHandler(svc *service.GitHubIntegrationService) *GitHubI
 // Connect 連接 GitHub（儲存並驗證 PAT）
 // POST /api/v1/integrations/github/connect
 //
-// 成功：201 Created，body 含 username / scopes / token_set=true
+// 成功：201 Created，扁平 body 含 id / username / scopes / token_set / created_at / updated_at
 // 失敗：
 //   - 400 Bad Request：缺少 token 欄位
 //   - 422 GITHUB_TOKEN_INVALID：PAT 無效或已過期
-//   - 422 GITHUB_INSUFFICIENT_SCOPE：PAT 缺少必要 scopes
+//   - 422 GITHUB_TOKEN_INSUFFICIENT_SCOPE：PAT 缺少必要 scopes
 //   - 503 GITHUB_UNAVAILABLE：GitHub API 無法連線
 func (h *GitHubIntegrationHandler) Connect(c *gin.Context) {
 	var req dto.GitHubConnectRequest
@@ -48,13 +48,17 @@ func (h *GitHubIntegrationHandler) Connect(c *gin.Context) {
 		return
 	}
 
+	gi := result.Integration
 	c.JSON(http.StatusCreated, dto.GitHubConnectResponse{
-		Message: "GitHub 整合連接成功",
-		Integration: dto.GitHubIntegrationDTO{
-			Username: result.Username,
-			Scopes:   result.Scopes,
-			TokenSet: true,
-		},
+		ID:           gi.ID.String(),
+		Username:     gi.Username,
+		Scopes:       gi.Scopes,
+		TokenSet:     true,
+		LastSyncedAt: gi.LastSyncedAt,
+		LastError:    gi.LastError,
+		LastErrorAt:  gi.LastErrorAt,
+		CreatedAt:    gi.CreatedAt,
+		UpdatedAt:    gi.UpdatedAt,
 	})
 }
 
@@ -62,7 +66,7 @@ func (h *GitHubIntegrationHandler) Connect(c *gin.Context) {
 // GET /api/v1/integrations/github/status
 //
 // 未連接：200 { "connected": false }
-// 已連接：200 { "connected": true, "integration": { username, scopes, token_set, last_synced_at, last_error } }
+// 已連接：200 扁平結構含 connected / id / username / scopes / token_set / last_synced_at / last_error / last_error_at / created_at / updated_at
 func (h *GitHubIntegrationHandler) GetStatus(c *gin.Context) {
 	connected, gi, err := h.svc.GetStatus(c.Request.Context())
 	if err != nil {
@@ -71,23 +75,23 @@ func (h *GitHubIntegrationHandler) GetStatus(c *gin.Context) {
 	}
 
 	if !connected {
-		c.JSON(http.StatusOK, dto.GitHubStatusResponse{
+		c.JSON(http.StatusOK, dto.GitHubStatusDisconnectedResponse{
 			Connected: false,
 		})
 		return
 	}
 
-	integration := &dto.GitHubIntegrationDTO{
+	c.JSON(http.StatusOK, dto.GitHubStatusConnectedResponse{
+		Connected:    true,
+		ID:           gi.ID.String(),
 		Username:     gi.Username,
 		Scopes:       gi.Scopes,
 		TokenSet:     true,
 		LastSyncedAt: gi.LastSyncedAt,
 		LastError:    gi.LastError,
-	}
-
-	c.JSON(http.StatusOK, dto.GitHubStatusResponse{
-		Connected:   true,
-		Integration: integration,
+		LastErrorAt:  gi.LastErrorAt,
+		CreatedAt:    gi.CreatedAt,
+		UpdatedAt:    gi.UpdatedAt,
 	})
 }
 
