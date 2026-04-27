@@ -2,18 +2,29 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
+/**
+ * Badge — 自寫元件，吃 F-035 design tokens
+ *
+ * Variants: default / secondary / outline / danger / success / warning
+ */
+
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center rounded-ed-sm border px-2 py-0.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[--ring]",
   {
     variants: {
       variant: {
-        default: "border-transparent bg-primary text-primary-foreground",
-        secondary: "border-transparent bg-secondary text-secondary-foreground",
-        destructive:
-          "border-transparent bg-destructive text-destructive-foreground",
-        success: "border-transparent bg-success text-success-foreground",
-        warning: "border-transparent bg-warning text-warning-foreground",
-        outline: "text-foreground",
+        default:
+          "border-transparent bg-[--accent] text-[--accent-fg]",
+        secondary:
+          "border-transparent bg-[--bg-muted] text-[--fg-muted]",
+        outline:
+          "border-[--border] text-[--fg]",
+        danger:
+          "border-transparent bg-[--danger] text-[--danger-fg]",
+        success:
+          "border-transparent bg-[--success] text-[--success-fg]",
+        warning:
+          "border-transparent bg-[--warning] text-[--warning-fg]",
       },
     },
     defaultVariants: { variant: "default" },

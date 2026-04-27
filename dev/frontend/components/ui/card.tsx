@@ -1,12 +1,17 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Card — 自寫元件，吃 F-035 design tokens
+ * Card / CardHeader / CardTitle / CardDescription / CardContent / CardFooter
+ */
+
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
-        "rounded-lg border bg-card text-card-foreground shadow-sm",
+        "rounded-ed-lg border border-[--border] bg-[--surface] text-[--fg] shadow-ed-sm",
         className,
       )}
       {...props}
@@ -26,7 +31,7 @@ const CardTitle = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivE
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
-      className={cn("text-lg font-semibold leading-none tracking-tight", className)}
+      className={cn("text-lg font-semibold leading-none tracking-tight text-[--fg]", className)}
       {...props}
     />
   ),
@@ -37,7 +42,7 @@ const CardDescription = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />
+  <div ref={ref} className={cn("text-sm text-[--fg-muted]", className)} {...props} />
 ));
 CardDescription.displayName = "CardDescription";
 
