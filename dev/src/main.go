@@ -136,10 +136,19 @@ func main() {
 	calendarSvc := service.NewCalendarService(entryRepo, gcalSvc, true, journalRepo)
 	calendarHandler := handler.NewCalendarHandler(calendarSvc)
 
-	// 初始化日記服務（F-028b：CRUD；F-028c：LLM draft）
+	// 初始化 GitHub 整合服務（F-034a：connect / status / disconnect）
+	githubIntegrationRepo := repository.NewGitHubIntegrationRepository(pool)
+	githubIntegrationSvc := service.NewGitHubIntegrationService(githubIntegrationRepo, aesCrypto)
+	githubIntegrationHandler := handler.NewGitHubIntegrationHandler(githubIntegrationSvc)
+
+	// 初始化 GitHub commits 服務（F-034b：fetch commits + per-repo fallback）
+	githubCommitsSvc := service.NewGitHubCommitsService(githubIntegrationSvc)
+	githubCommitsHandler := handler.NewGitHubCommitsHandler(githubCommitsSvc)
+
+	// 初始化日記服務（F-028b：CRUD；F-028c：LLM draft；F-034d：整合 GitHub commits）
 	journalSvc := service.NewJournalService(journalRepo, entryRepo)
 	journalHandler := handler.NewJournalHandler(journalSvc)
-	journalDraftSvc := service.NewJournalDraftService(llmSvc, entryRepo, gcalSvc)
+	journalDraftSvc := service.NewJournalDraftService(llmSvc, entryRepo, gcalSvc, githubCommitsSvc)
 	journalDraftHandler := handler.NewJournalDraftHandler(journalDraftSvc)
 	journalAutoHandler := handler.NewJournalAutoHandler(journalSvc, journalDraftSvc)
 
@@ -152,15 +161,6 @@ func main() {
 	// 初始化任務服務（F-031c：CRUD + complete + upcoming/overdue）
 	taskSvc := service.NewTaskService(taskRepo, projectRepo, entryRepo, journalRepo, projectSvc)
 	taskHandler := handler.NewTaskHandler(taskSvc, projectSvc)
-
-	// 初始化 GitHub 整合服務（F-034a：connect / status / disconnect）
-	githubIntegrationRepo := repository.NewGitHubIntegrationRepository(pool)
-	githubIntegrationSvc := service.NewGitHubIntegrationService(githubIntegrationRepo, aesCrypto)
-	githubIntegrationHandler := handler.NewGitHubIntegrationHandler(githubIntegrationSvc)
-
-	// 初始化 GitHub commits 服務（F-034b：fetch commits + per-repo fallback）
-	githubCommitsSvc := service.NewGitHubCommitsService(githubIntegrationSvc)
-	githubCommitsHandler := handler.NewGitHubCommitsHandler(githubCommitsSvc)
 
 	// 設定路由
 	r := router.Setup(pool, apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, journalAutoHandler, projectHandler, taskHandler, githubIntegrationHandler, githubCommitsHandler)

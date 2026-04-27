@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -17,30 +18,34 @@ import (
 //
 // 不直接寫入 DB；呼叫端拿到 draft 後讓使用者編輯，再透過 PATCH /journal/:date 落地。
 type JournalDraftService struct {
-	llmSvc      *LlmService
-	entryRepo   EntryRepository
-	gcalSvc     *GcalService // optional：gcal 未連時跳過
-	maxContent  int          // entries 內容 char 上限（避免 prompt 爆量）
-	timeoutSecs int          // 預設 60s
+	llmSvc           *LlmService
+	entryRepo        EntryRepository
+	gcalSvc          *GcalService          // optional：gcal 未連時跳過
+	githubCommitsSvc *GitHubCommitsService // optional：github 未連時跳過
+	maxContent       int                   // entries 內容 char 上限（避免 prompt 爆量）
+	timeoutSecs      int                   // 預設 60s
 }
 
 // NewJournalDraftService 建立 JournalDraftService。
-func NewJournalDraftService(llmSvc *LlmService, entryRepo EntryRepository, gcalSvc *GcalService) *JournalDraftService {
+// githubCommitsSvc 可傳 nil（向後相容）。
+func NewJournalDraftService(llmSvc *LlmService, entryRepo EntryRepository, gcalSvc *GcalService, githubCommitsSvc *GitHubCommitsService) *JournalDraftService {
 	return &JournalDraftService{
-		llmSvc:      llmSvc,
-		entryRepo:   entryRepo,
-		gcalSvc:     gcalSvc,
-		maxContent:  4000,
-		timeoutSecs: 60,
+		llmSvc:           llmSvc,
+		entryRepo:        entryRepo,
+		gcalSvc:          gcalSvc,
+		githubCommitsSvc: githubCommitsSvc,
+		maxContent:       4000,
+		timeoutSecs:      60,
 	}
 }
 
 // JournalDraftResult LLM 回傳結果（直接帶 markdown）。
 type JournalDraftResult struct {
-	Draft     string   `json:"draft"`
-	UsedRefs  []string `json:"used_refs,omitempty"` // 來源 entry IDs / event IDs（用於前端 source-refs panel）
-	Mood      string   `json:"mood,omitempty"`      // optional 推測情緒
-	GeneratedBy string `json:"generated_by"`
+	Draft       string   `json:"draft"`
+	UsedRefs    []string `json:"used_refs,omitempty"` // 來源 entry IDs / event IDs（用於前端 source-refs panel）
+	Mood        string   `json:"mood,omitempty"`      // optional 推測情緒
+	GeneratedBy string   `json:"generated_by"`
+	Warnings    []string `json:"warnings,omitempty"` // 非致命性警告（例如 GitHub 無法取得）
 }
 
 // Draft 為指定日期生成日記草稿。
@@ -77,11 +82,23 @@ func (s *JournalDraftService) Draft(ctx context.Context, dateStr, tz, calendarID
 		}
 	}
 
+	// GitHub commits（best-effort，失敗不阻擋主流程）
+	var commits []GithubCommit
+	var warnings []string
+	if s.githubCommitsSvc != nil {
+		githubCommits, githubWarning := s.fetchGitHubCommitsForDate(ctx, dateStr, tz)
+		if githubWarning != "" {
+			warnings = append(warnings, githubWarning)
+		} else {
+			commits = githubCommits
+		}
+	}
+
 	if len(entries) == 0 && len(events) == 0 {
 		return nil, model.NewAppError(404, model.ErrCodeNotFound, "當日無可參考素材，無法生成日記草稿")
 	}
 
-	prompt := s.buildPrompt(dateStr, entries, events)
+	prompt := s.buildPrompt(dateStr, entries, events, commits)
 
 	// 呼叫 LLM（使用 chat completion；非 streaming，依 spec/tech-survey 決策）
 	provider, err := s.llmSvc.providerSvc.GetActiveProvider(ctx)
@@ -138,6 +155,7 @@ func (s *JournalDraftService) Draft(ctx context.Context, dateStr, tz, calendarID
 		parsed.Draft = strings.TrimSpace(raw)
 	}
 	parsed.GeneratedBy = provider.Name + "/" + provider.ModelName
+	parsed.Warnings = warnings
 	return &parsed, nil
 }
 
@@ -207,8 +225,58 @@ func (s *JournalDraftService) fetchGcalEventsForDate(ctx context.Context, dateSt
 	return out, nil
 }
 
+// fetchGitHubCommitsForDate 取得指定日期的 GitHub commits（best-effort）。
+// 成功回傳 commits, ""；失敗回傳 nil, warning 訊息。
+func (s *JournalDraftService) fetchGitHubCommitsForDate(ctx context.Context, dateStr, tz string) ([]GithubCommit, string) {
+	if tz == "" {
+		tz = "UTC"
+	}
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return nil, "GitHub commits 時區解析失敗"
+	}
+	d, err := time.ParseInLocation("2006-01-02", dateStr, loc)
+	if err != nil {
+		return nil, "GitHub commits 日期解析失敗"
+	}
+	sinceUTC := d.UTC()
+	untilUTC := d.AddDate(0, 0, 1).UTC()
+
+	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	commits, _, fetchErr := s.githubCommitsSvc.FetchCommits(fetchCtx, sinceUTC, untilUTC)
+	if fetchErr == nil {
+		return commits, ""
+	}
+
+	// 依錯誤類型產生 warning 訊息
+	slog.Warn("draft: 取 GitHub commits 失敗，跳過", "error", fetchErr)
+
+	// RateLimitError（需先判斷，因為內嵌 AppError）
+	var rateLimitErr *model.RateLimitError
+	if errors.As(fetchErr, &rateLimitErr) {
+		return nil, fmt.Sprintf("GitHub API rate limit 超限，retry_after_seconds=%d", rateLimitErr.RetryAfterSeconds)
+	}
+
+	var appErr *model.AppError
+	if errors.As(fetchErr, &appErr) {
+		switch appErr.Code {
+		case model.ErrCodeGitHubNotConnected:
+			// 未連 GitHub，靜默不警告
+			return nil, ""
+		case model.ErrCodeGitHubTokenInvalid:
+			return nil, "GitHub PAT 失效，請至設定頁更新"
+		case model.ErrCodeGitHubUnavailable:
+			return nil, "GitHub 暫時無法連線"
+		}
+	}
+
+	return nil, "GitHub 暫時無法整合"
+}
+
 // buildPrompt 將當日素材組成 prompt（截斷過長 entry 內容防止 prompt 爆量）。
-func (s *JournalDraftService) buildPrompt(date string, entries []dto.CalendarEntrySummary, events []*gcalEventLike) string {
+func (s *JournalDraftService) buildPrompt(date string, entries []dto.CalendarEntrySummary, events []*gcalEventLike, commits []GithubCommit) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "請根據下列素材，為日期 %s 撰寫一篇日記草稿。\n\n", date)
 
@@ -237,6 +305,19 @@ func (s *JournalDraftService) buildPrompt(date string, entries []dto.CalendarEnt
 		b.WriteString("## Google Calendar 事件\n")
 		for _, ev := range events {
 			fmt.Fprintf(&b, "- [%s] %s（%s ~ %s）\n", ev.ID, ev.Summary, ev.Start, ev.End)
+		}
+		b.WriteString("\n")
+	}
+
+	if len(commits) > 0 {
+		b.WriteString("## GitHub 推送\n")
+		for _, c := range commits {
+			// 只取 message 第一行，避免 prompt 爆量
+			firstLine := c.Message
+			if idx := strings.Index(firstLine, "\n"); idx >= 0 {
+				firstLine = firstLine[:idx]
+			}
+			fmt.Fprintf(&b, "- %s: %s\n", c.Repo, firstLine)
 		}
 		b.WriteString("\n")
 	}

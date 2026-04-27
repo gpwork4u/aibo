@@ -67,7 +67,7 @@ var _ service.EntryRepository = (*stubJournalDraftEntryRepo)(nil)
 // 400 INVALID_INPUT：日期格式錯
 // -----------------------------------------------------------------------------
 func TestJournalDraft_InvalidDate(t *testing.T) {
-	svc := service.NewJournalDraftService(nil, &stubJournalDraftEntryRepo{}, nil)
+	svc := service.NewJournalDraftService(nil, &stubJournalDraftEntryRepo{}, nil, nil)
 	_, err := svc.Draft(context.Background(), "2026-13-99", "UTC", "primary")
 	if err == nil {
 		t.Fatal("預期 400 invalid date")
@@ -82,7 +82,7 @@ func TestJournalDraft_InvalidDate(t *testing.T) {
 // 400 INVALID_INPUT：tz 格式錯
 // -----------------------------------------------------------------------------
 func TestJournalDraft_InvalidTimezone(t *testing.T) {
-	svc := service.NewJournalDraftService(nil, &stubJournalDraftEntryRepo{}, nil)
+	svc := service.NewJournalDraftService(nil, &stubJournalDraftEntryRepo{}, nil, nil)
 	_, err := svc.Draft(context.Background(), "2026-04-25", "Mars/Olympus", "primary")
 	if err == nil {
 		t.Fatal("預期 400 invalid tz")
@@ -98,7 +98,7 @@ func TestJournalDraft_InvalidTimezone(t *testing.T) {
 // -----------------------------------------------------------------------------
 func TestJournalDraft_NoData(t *testing.T) {
 	repo := &stubJournalDraftEntryRepo{entries: nil}
-	svc := service.NewJournalDraftService(nil, repo, nil) // gcalSvc nil → 不嘗試 gcal
+	svc := service.NewJournalDraftService(nil, repo, nil, nil) // gcalSvc nil → 不嘗試 gcal
 	_, err := svc.Draft(context.Background(), "2026-04-25", "UTC", "primary")
 	if err == nil {
 		t.Fatal("預期 404 no data")
@@ -114,7 +114,7 @@ func TestJournalDraft_NoData(t *testing.T) {
 // -----------------------------------------------------------------------------
 func TestJournalDraft_RepoError(t *testing.T) {
 	repo := &stubJournalDraftEntryRepo{err: fakeRepoErr("db down")}
-	svc := service.NewJournalDraftService(nil, repo, nil)
+	svc := service.NewJournalDraftService(nil, repo, nil, nil)
 	_, err := svc.Draft(context.Background(), "2026-04-25", "UTC", "primary")
 	if err == nil {
 		t.Fatal("預期錯誤")
