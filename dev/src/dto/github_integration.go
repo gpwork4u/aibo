@@ -41,3 +41,31 @@ type GitHubStatusConnectedResponse struct {
 type GitHubStatusDisconnectedResponse struct {
 	Connected bool `json:"connected"`
 }
+
+// GitHubCommit 單筆 commit 的 API 回應結構
+type GitHubCommit struct {
+	SHA         string    `json:"sha"`
+	Repo        string    `json:"repo"`
+	Message     string    `json:"message"`
+	URL         string    `json:"url"`
+	CommittedAt time.Time `json:"committed_at"`
+	Additions   int       `json:"additions"`
+	Deletions   int       `json:"deletions"`
+}
+
+// GitHubCommitsResponse GET /api/v1/integrations/github/commits 的回應 body
+type GitHubCommitsResponse struct {
+	Date      string         `json:"date"`
+	Username  string         `json:"username"`
+	Commits   []GitHubCommit `json:"commits"`
+	Total     int            `json:"total"`
+	Truncated bool           `json:"truncated"`
+	Warning   *string        `json:"warning,omitempty"`
+}
+
+// GitHubRateLimitErrorResponse rate limit 錯誤的回應 body
+type GitHubRateLimitErrorResponse struct {
+	Code              string `json:"code"`
+	Message           string `json:"message"`
+	RetryAfterSeconds int    `json:"retry_after_seconds"`
+}
