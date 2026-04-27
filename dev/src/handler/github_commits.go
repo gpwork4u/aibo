@@ -23,13 +23,13 @@ func NewGitHubCommitsHandler(svc *service.GitHubCommitsService) *GitHubCommitsHa
 }
 
 // ListCommits 取得指定日期的 GitHub commits
-// GET /api/v1/integrations/github/commits?since=YYYY-MM-DD&until=YYYY-MM-DD
+// GET /api/v1/integrations/github/commits?date=YYYY-MM-DD
 //
 // 支援 X-Timezone header（預設 UTC）
-// 回應：{ commits: [...], total: N, truncated: bool }
+// 回應：{ date, username, commits: [...], total: N, truncated: bool }
 //
 // 錯誤：
-//   - 400 INVALID_INPUT：日期格式不正確
+//   - 400 INVALID_INPUT：date 參數缺少或格式不正確
 //   - 404 GITHUB_NOT_CONNECTED：尚未設定 GitHub 整合
 //   - 422 GITHUB_TOKEN_INVALID：PAT 無效或已過期
 //   - 429 GITHUB_RATE_LIMITED：rate limit 超限（帶 retry_after_seconds）
@@ -48,47 +48,29 @@ func (h *GitHubCommitsHandler) ListCommits(c *gin.Context) {
 		tz = "UTC"
 	}
 
-	// 解析 since 參數（必填）
-	sinceStr := c.Query("since")
-	if sinceStr == "" {
+	// 解析 date 參數（必填，格式：YYYY-MM-DD）
+	dateStr := c.Query("date")
+	if dateStr == "" {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Code:    model.ErrCodeInvalidInput,
-			Message: "since 參數為必填（格式：YYYY-MM-DD）",
+			Message: "date 參數為必填（格式：YYYY-MM-DD）",
 		})
 		return
 	}
 
-	sinceDate, err := time.ParseInLocation("2006-01-02", sinceStr, loc)
+	date, err := time.ParseInLocation("2006-01-02", dateStr, loc)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Code:    model.ErrCodeInvalidInput,
-			Message: "since 日期格式不正確，請使用 YYYY-MM-DD",
+			Message: "date 日期格式不正確，請使用 YYYY-MM-DD",
 		})
 		return
 	}
 
-	// since 轉為當日 00:00:00 UTC
-	sinceUTC := sinceDate.UTC()
-
-	// 解析 until 參數（選填；預設為 since 同一天的 23:59:59.999）
-	untilStr := c.Query("until")
-	var untilUTC time.Time
-
-	if untilStr != "" {
-		untilDate, err := time.ParseInLocation("2006-01-02", untilStr, loc)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-				Code:    model.ErrCodeInvalidInput,
-				Message: "until 日期格式不正確，請使用 YYYY-MM-DD",
-			})
-			return
-		}
-		// until 轉為當日結束（下一天 00:00:00 UTC，exclusive）
-		untilUTC = untilDate.AddDate(0, 0, 1).UTC()
-	} else {
-		// 預設：since 的當天結束
-		untilUTC = sinceDate.AddDate(0, 0, 1).UTC()
-	}
+	// 將 date 解成當天 00:00:00（使用者時區）→ UTC
+	sinceUTC := date.UTC()
+	// 隔天 00:00:00 UTC（exclusive）
+	untilUTC := date.AddDate(0, 0, 1).UTC()
 
 	// 呼叫 service
 	commits, meta, err := h.svc.FetchCommits(c.Request.Context(), sinceUTC, untilUTC)
@@ -113,7 +95,7 @@ func (h *GitHubCommitsHandler) ListCommits(c *gin.Context) {
 
 	// 組合回應
 	resp := dto.GitHubCommitsResponse{
-		Date:      sinceStr,
+		Date:      dateStr,
 		Username:  meta.Username,
 		Commits:   dtoCommits,
 		Total:     len(dtoCommits),

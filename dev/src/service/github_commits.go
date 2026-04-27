@@ -23,8 +23,11 @@ const (
 	// githubEventsPerPage 每頁筆數
 	githubEventsPerPage = 30
 
-	// githubCommitsTimeout GitHub API 呼叫最大等待時間（10s）
-	githubCommitsTimeout = 10 * time.Second
+	// githubEventsTimeout events 階段 timeout（10s）
+	githubEventsTimeout = 10 * time.Second
+
+	// githubFallbackTimeout fallback 階段（per-repo）timeout（15s）
+	githubFallbackTimeout = 15 * time.Second
 )
 
 // GithubCommit 單筆 commit 資訊
@@ -34,8 +37,8 @@ type GithubCommit struct {
 	Message     string    `json:"message"`
 	URL         string    `json:"url"`
 	CommittedAt time.Time `json:"committed_at"`
-	Additions   int       `json:"additions"`
-	Deletions   int       `json:"deletions"`
+	Additions   *int      `json:"additions"`
+	Deletions   *int      `json:"deletions"`
 }
 
 // FetchMeta FetchCommits 的附帶元資料
@@ -67,10 +70,6 @@ func NewGitHubCommitsService(integrationSvc *GitHubIntegrationService) *GitHubCo
 //  6. sha 去重，截斷至 200 筆
 //  7. 成功後更新 last_synced_at；失敗後記錄 last_error
 func (s *GitHubCommitsService) FetchCommits(ctx context.Context, sinceUTC, untilUTC time.Time) ([]GithubCommit, FetchMeta, error) {
-	// 加上 10s timeout
-	ctx, cancel := context.WithTimeout(ctx, githubCommitsTimeout)
-	defer cancel()
-
 	// 取得整合設定（包含 username 及 ID）
 	_, integration, err := s.integrationSvc.GetStatus(ctx)
 	if err != nil {
@@ -96,13 +95,17 @@ func (s *GitHubCommitsService) FetchCommits(ctx context.Context, sinceUTC, until
 		"token", redactToken(pat),
 	)
 
-	// 建立 oauth2 authenticated HTTP client
+	// 建立 oauth2 authenticated HTTP client（使用 base ctx，各階段獨立 timeout）
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: pat})
 	httpClient := oauth2.NewClient(ctx, ts)
 	client := gogithub.NewClient(httpClient)
 
+	// events 階段：10s timeout
+	eventsCtx, eventsCancel := context.WithTimeout(ctx, githubEventsTimeout)
+	defer eventsCancel()
+
 	// 取得 PushEvent commits（主路徑）
-	commits, hitPageLimit, repoSet, err := s.fetchViaEvents(ctx, client, integration.Username, sinceUTC, untilUTC)
+	commits, hitPageLimit, repoSet, err := s.fetchViaEvents(eventsCtx, client, integration.Username, sinceUTC, untilUTC)
 	if err != nil {
 		// 記錄 last_error
 		_ = s.integrationSvc.repo.UpdateLastError(ctx, integration.ID, err.Error())
@@ -112,7 +115,10 @@ func (s *GitHubCommitsService) FetchCommits(ctx context.Context, sinceUTC, until
 	// 若 events 達頁數上限（可能截斷），觸發 per-repo fallback
 	if hitPageLimit && len(repoSet) > 0 {
 		slog.Info("Events 達頁數上限，觸發 per-repo fallback", "repos", len(repoSet))
-		fallbackCommits, fallbackErr := s.fetchViaRepos(ctx, client, integration.Username, sinceUTC, untilUTC, repoSet)
+		// fallback 階段：15s timeout（per-repo iterate 較慢）
+		fallbackCtx, fallbackCancel := context.WithTimeout(ctx, githubFallbackTimeout)
+		defer fallbackCancel()
+		fallbackCommits, fallbackErr := s.fetchViaRepos(fallbackCtx, client, integration.Username, sinceUTC, untilUTC, repoSet)
 		if fallbackErr != nil {
 			slog.Warn("per-repo fallback 失敗，使用 events 資料", "error", fallbackErr)
 		} else {
@@ -216,7 +222,7 @@ func (s *GitHubCommitsService) fetchViaEvents(
 			}
 
 			for _, c := range pushPayload.Commits {
-				// 用 event created_at 當作 committed_at（PushEvent payload 的 commits 沒有 timestamp）
+				// PushEvent payload 的 commits 沒有 timestamp，用 event.CreatedAt 近似（同一 push 內所有 commits 標同時間）
 				committedAt := createdAt
 
 				// 過濾不在時間範圍內的 commits
@@ -231,13 +237,13 @@ func (s *GitHubCommitsService) fetchViaEvents(
 
 				url := fmt.Sprintf("https://github.com/%s/commit/%s", repoName, sha)
 
+				// Additions / Deletions 在 events API 無法取得（保持 nil），由 fallback 補充
 				commits = append(commits, GithubCommit{
 					SHA:         sha,
 					Repo:        repoName,
 					Message:     c.GetMessage(),
 					URL:         url,
 					CommittedAt: committedAt,
-					// Additions / Deletions 在 events API 無法取得，由 fallback 補充
 				})
 			}
 		}
@@ -318,11 +324,12 @@ func (s *GitHubCommitsService) fetchViaRepos(
 				message = rc.Commit.GetMessage()
 			}
 
-			additions := 0
-			deletions := 0
+			var additions, deletions *int
 			if rc.Stats != nil {
-				additions = rc.Stats.GetAdditions()
-				deletions = rc.Stats.GetDeletions()
+				a := rc.Stats.GetAdditions()
+				d := rc.Stats.GetDeletions()
+				additions = &a
+				deletions = &d
 			}
 
 			url := rc.GetHTMLURL()

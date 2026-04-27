@@ -49,8 +49,8 @@ type GitHubCommit struct {
 	Message     string    `json:"message"`
 	URL         string    `json:"url"`
 	CommittedAt time.Time `json:"committed_at"`
-	Additions   int       `json:"additions"`
-	Deletions   int       `json:"deletions"`
+	Additions   *int      `json:"additions"`
+	Deletions   *int      `json:"deletions"`
 }
 
 // GitHubCommitsResponse GET /api/v1/integrations/github/commits 的回應 body
