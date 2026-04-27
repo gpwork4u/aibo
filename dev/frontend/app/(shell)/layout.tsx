@@ -5,6 +5,8 @@ import { Sidebar } from "@/components/shell/sidebar";
 import { TopBar } from "@/components/shell/top-bar";
 import { MainArea } from "@/components/shell/main-area";
 import { CopilotSlot } from "@/components/shell/copilot-slot";
+import { CmdkProvider } from "@/components/cmdk/cmdk-provider";
+import { CommandPalette } from "@/components/cmdk/command-palette";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { useApiKey } from "@/lib/hooks/use-api-key";
@@ -55,18 +57,23 @@ export default function ShellLayout({
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden">
-      {/* 左側 Sidebar */}
-      <Sidebar inboxCount={inboxCount} />
+    <CmdkProvider>
+      <div className="flex h-screen w-full overflow-hidden">
+        {/* 左側 Sidebar */}
+        <Sidebar inboxCount={inboxCount} />
 
-      {/* 中間區域：TopBar + 內容 */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar />
-        <MainArea>{children}</MainArea>
+        {/* 中間區域：TopBar + 內容 */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopBar />
+          <MainArea>{children}</MainArea>
+        </div>
+
+        {/* 右側 Copilot 佔位 */}
+        <CopilotSlot open={copilotOpen} onClose={() => setCopilotOpen(false)} />
+
+        {/* 全域 Command Palette overlay */}
+        <CommandPalette />
       </div>
-
-      {/* 右側 Copilot 佔位 */}
-      <CopilotSlot open={copilotOpen} onClose={() => setCopilotOpen(false)} />
-    </div>
+    </CmdkProvider>
   );
 }
