@@ -1,0 +1,161 @@
+{
+  "_comment": "aibo Design Tokens — Color System (Sprint 13)\nBased on globals.css CSS variables, editorial paper-style aesthetic.\nOKLCH values align with Tailwind CSS v4 @theme inline convention.\nAll tokens exist in both light and dark modes.",
+
+  "color": {
+    "light": {
+      "bg": {
+        "default":  "oklch(0.99 0.004 85)",
+        "subtle":   "oklch(0.97 0.005 85)",
+        "muted":    "oklch(0.94 0.006 85)",
+        "inverse":  "oklch(0.12 0.008 240)"
+      },
+      "fg": {
+        "default":  "oklch(0.14 0.010 240)",
+        "muted":    "oklch(0.46 0.010 240)",
+        "subtle":   "oklch(0.62 0.008 240)",
+        "inverse":  "oklch(0.98 0.004 0)"
+      },
+      "border": {
+        "default":  "oklch(0.90 0.006 240)",
+        "strong":   "oklch(0.84 0.008 240)",
+        "focus":    "oklch(0.55 0.080 240)"
+      },
+      "primary": {
+        "default":  "oklch(0.14 0.010 240)",
+        "hover":    "oklch(0.22 0.012 240)",
+        "active":   "oklch(0.10 0.008 240)",
+        "fg":       "oklch(0.98 0.004 0)"
+      },
+      "secondary": {
+        "default":  "oklch(0.94 0.006 240)",
+        "hover":    "oklch(0.90 0.008 240)",
+        "active":   "oklch(0.86 0.010 240)",
+        "fg":       "oklch(0.14 0.010 240)"
+      },
+      "accent": {
+        "default":  "oklch(0.60 0.080 250)",
+        "subtle":   "oklch(0.92 0.020 250)",
+        "fg":       "oklch(0.98 0.004 0)"
+      },
+      "danger": {
+        "default":  "oklch(0.55 0.180 25)",
+        "subtle":   "oklch(0.94 0.030 25)",
+        "hover":    "oklch(0.48 0.190 25)",
+        "fg":       "oklch(0.98 0.004 0)"
+      },
+      "warning": {
+        "default":  "oklch(0.68 0.160 65)",
+        "subtle":   "oklch(0.95 0.040 65)",
+        "fg":       "oklch(0.24 0.060 65)"
+      },
+      "success": {
+        "default":  "oklch(0.55 0.140 145)",
+        "subtle":   "oklch(0.93 0.030 145)",
+        "fg":       "oklch(0.98 0.004 0)"
+      },
+      "card": {
+        "default":  "oklch(0.99 0.004 85)",
+        "border":   "oklch(0.90 0.006 240)"
+      },
+      "sidebar": {
+        "bg":        "oklch(0.97 0.005 85)",
+        "fg":        "oklch(0.28 0.012 240)",
+        "active-bg": "oklch(0.94 0.006 85)",
+        "active-fg": "oklch(0.14 0.010 240)",
+        "border":    "oklch(0.88 0.008 220)"
+      },
+      "ring":        "oklch(0.14 0.010 240)",
+      "input":       "oklch(0.90 0.006 240)",
+      "overlay":     "oklch(0.10 0.008 240 / 0.55)"
+    },
+
+    "dark": {
+      "bg": {
+        "default":  "oklch(0.14 0.012 240)",
+        "subtle":   "oklch(0.17 0.012 240)",
+        "muted":    "oklch(0.20 0.012 240)",
+        "inverse":  "oklch(0.96 0.005 85)"
+      },
+      "fg": {
+        "default":  "oklch(0.96 0.005 0)",
+        "muted":    "oklch(0.65 0.010 240)",
+        "subtle":   "oklch(0.48 0.010 240)",
+        "inverse":  "oklch(0.14 0.010 240)"
+      },
+      "border": {
+        "default":  "oklch(0.26 0.012 240)",
+        "strong":   "oklch(0.34 0.012 240)",
+        "focus":    "oklch(0.72 0.060 240)"
+      },
+      "primary": {
+        "default":  "oklch(0.96 0.005 0)",
+        "hover":    "oklch(0.88 0.006 0)",
+        "active":   "oklch(0.80 0.008 0)",
+        "fg":       "oklch(0.14 0.010 240)"
+      },
+      "secondary": {
+        "default":  "oklch(0.22 0.012 240)",
+        "hover":    "oklch(0.26 0.014 240)",
+        "active":   "oklch(0.30 0.014 240)",
+        "fg":       "oklch(0.96 0.005 0)"
+      },
+      "accent": {
+        "default":  "oklch(0.68 0.080 250)",
+        "subtle":   "oklch(0.24 0.030 250)",
+        "fg":       "oklch(0.98 0.004 0)"
+      },
+      "danger": {
+        "default":  "oklch(0.45 0.160 25)",
+        "subtle":   "oklch(0.22 0.040 25)",
+        "hover":    "oklch(0.50 0.170 25)",
+        "fg":       "oklch(0.98 0.004 0)"
+      },
+      "warning": {
+        "default":  "oklch(0.68 0.160 65)",
+        "subtle":   "oklch(0.24 0.040 65)",
+        "fg":       "oklch(0.24 0.060 65)"
+      },
+      "success": {
+        "default":  "oklch(0.52 0.130 145)",
+        "subtle":   "oklch(0.20 0.040 145)",
+        "fg":       "oklch(0.98 0.004 0)"
+      },
+      "card": {
+        "default":  "oklch(0.14 0.012 240)",
+        "border":   "oklch(0.26 0.012 240)"
+      },
+      "sidebar": {
+        "bg":        "oklch(0.17 0.012 240)",
+        "fg":        "oklch(0.80 0.008 240)",
+        "active-bg": "oklch(0.22 0.012 240)",
+        "active-fg": "oklch(0.96 0.005 0)",
+        "border":    "oklch(0.26 0.012 240)"
+      },
+      "ring":        "oklch(0.72 0.060 240)",
+      "input":       "oklch(0.26 0.012 240)",
+      "overlay":     "oklch(0.08 0.010 240 / 0.65)"
+    },
+
+    "_css-variable-mapping": {
+      "--background":          "color.{mode}.bg.default",
+      "--foreground":          "color.{mode}.fg.default",
+      "--card":                "color.{mode}.card.default",
+      "--card-foreground":     "color.{mode}.fg.default",
+      "--popover":             "color.{mode}.card.default",
+      "--popover-foreground":  "color.{mode}.fg.default",
+      "--primary":             "color.{mode}.primary.default",
+      "--primary-foreground":  "color.{mode}.primary.fg",
+      "--secondary":           "color.{mode}.secondary.default",
+      "--secondary-foreground":"color.{mode}.secondary.fg",
+      "--muted":               "color.{mode}.secondary.default",
+      "--muted-foreground":    "color.{mode}.fg.muted",
+      "--accent":              "color.{mode}.secondary.default",
+      "--accent-foreground":   "color.{mode}.secondary.fg",
+      "--destructive":         "color.{mode}.danger.default",
+      "--destructive-foreground":"color.{mode}.danger.fg",
+      "--border":              "color.{mode}.border.default",
+      "--input":               "color.{mode}.input",
+      "--ring":                "color.{mode}.ring"
+    }
+  }
+}
