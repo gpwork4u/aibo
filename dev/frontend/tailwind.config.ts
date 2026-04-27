@@ -20,6 +20,38 @@ const config: Config = {
         mono: ["var(--font-mono)"],
       },
       colors: {
+        /* === F-035 Design Tokens (primary) === */
+        bg: {
+          DEFAULT: "var(--bg)",
+          subtle: "var(--bg-subtle)",
+          muted: "var(--bg-muted)",
+        },
+        fg: {
+          DEFAULT: "var(--fg)",
+          muted: "var(--fg-muted)",
+          subtle: "var(--fg-subtle)",
+        },
+        "bd": {
+          DEFAULT: "var(--border)",
+          strong: "var(--border-strong)",
+        },
+        "tok-accent": {
+          DEFAULT: "var(--accent)",
+          fg: "var(--accent-fg)",
+          soft: "var(--accent-soft)",
+        },
+        "tok-danger": {
+          DEFAULT: "var(--danger)",
+          fg: "var(--danger-fg)",
+        },
+        "tok-warning": {
+          DEFAULT: "var(--warning)",
+          fg: "var(--warning-fg)",
+        },
+        "tok-success": {
+          DEFAULT: "var(--success)",
+          fg: "var(--success-fg)",
+        },
         /* === F-035 Editorial tokens === */
         paper: {
           DEFAULT: "var(--paper)",
