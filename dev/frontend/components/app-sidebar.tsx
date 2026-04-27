@@ -7,6 +7,7 @@ import {
   Calendar,
   FileText,
   FolderTree,
+  Github,
   Inbox,
   KanbanSquare,
   Key,
@@ -47,6 +48,7 @@ export function AppSidebar({ inboxCount = 0, open, onClose }: AppSidebarProps) {
     { label: "API Key", href: "/settings/api-keys", icon: Key, testId: "nav-api-keys" },
     { label: "LLM Provider", href: "/settings/llm-providers", icon: Bot, testId: "nav-llm-providers" },
     { label: "Google Calendar", href: "/settings/gcal", icon: Calendar, testId: "nav-gcal" },
+    { label: "GitHub", href: "/settings/github", icon: Github, testId: "nav-github" },
   ];
 
   return (
