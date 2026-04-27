@@ -7,9 +7,13 @@
  * 涵蓋 scenarios：
  *  1. 未連 GitHub → /journal/:date/auto warnings 含「未連 GitHub」（不阻擋）
  *  2. 連線 + 當日有 commits → journal content 含「## GitHub 推送」區塊
- *  3. Rate limit 429 → warnings 含 retry_after
+ *  3. Rate limit 429 → GET /commits 回 429 + retry_after_seconds
  *  4. Commits > 200 → truncated=true + warnings
- *  5. PAT 過期 → warnings 含「PAT 失效」+ status last_error 寫入
+ *  5. PAT 過期 → GET /commits 回 422 GITHUB_TOKEN_INVALID + status.last_error 有值
+ *  6. 取 commits 但未連接 → GET /commits 回 404 GITHUB_NOT_CONNECTED
+ *  7. GitHub 暫時不可用 → GET /commits 回 503 GITHUB_UNAVAILABLE
+ *  8. 當日無 commits → GET /commits 回 200 + commits=[] + total=0
+ *  9. Journal draft 中 GitHub 失敗 → degraded → POST journal/auto 仍回 201，warnings 含 GitHub 錯誤
  *
  * 注意：此檔案測試的是後端 API 回應格式，透過 page.route() mock 後端。
  * 前端 UI 呈現由 github-journal-integration.spec.ts 覆蓋。
@@ -73,7 +77,7 @@ test.describe("GitHub Commits API 行為（F-034a/b/d）", () => {
     const journalAutoResponse = await page.evaluate(async () => {
       const res = await fetch("/api/v1/journal/2026-04-26/auto", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-API-Key": "mock-key" },
         body: JSON.stringify({ tone: "reflective" }),
       });
       return res.json();
@@ -123,7 +127,7 @@ test.describe("GitHub Commits API 行為（F-034a/b/d）", () => {
     const journalAutoResponse = await page.evaluate(async () => {
       const res = await fetch("/api/v1/journal/2026-04-26/auto", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-API-Key": "mock-key" },
         body: JSON.stringify({ tone: "reflective" }),
       });
       return res.json();
@@ -160,7 +164,7 @@ test.describe("GitHub Commits API 行為（F-034a/b/d）", () => {
     // WHEN 呼叫 GET /commits
     const commitsResponse = await page.evaluate(async () => {
       const res = await fetch("/api/v1/integrations/github/commits?date=2026-04-26", {
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-API-Key": "mock-key" },
       });
       return { status: res.status, body: await res.json() };
     });
@@ -200,7 +204,7 @@ test.describe("GitHub Commits API 行為（F-034a/b/d）", () => {
     // WHEN 呼叫 GET /commits
     const commitsResponse = await page.evaluate(async () => {
       const res = await fetch("/api/v1/integrations/github/commits?date=2026-04-26", {
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-API-Key": "mock-key" },
       });
       return { status: res.status, body: await res.json() };
     });
@@ -244,7 +248,7 @@ test.describe("GitHub Commits API 行為（F-034a/b/d）", () => {
     // WHEN 呼叫 GET /commits
     const commitsResponse = await page.evaluate(async () => {
       const res = await fetch("/api/v1/integrations/github/commits?date=2026-04-26", {
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-API-Key": "mock-key" },
       });
       return { status: res.status, body: await res.json() };
     });
@@ -255,12 +259,172 @@ test.describe("GitHub Commits API 行為（F-034a/b/d）", () => {
 
     // THEN GET /status 中 last_error 有值（前端應顯示 last_error banner）
     const statusResponse = await page.evaluate(async () => {
-      const res = await fetch("/api/v1/integrations/github/status");
+      const res = await fetch("/api/v1/integrations/github/status", {
+        headers: { "X-API-Key": "mock-key" },
+      });
       return res.json();
     });
 
     expect(statusResponse.connected).toBe(true);
     expect(statusResponse.last_error).toBeTruthy();
     expect(statusResponse.last_error_at).toBeTruthy();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Scenario 6: 取 commits 但未連接 → 404 GITHUB_NOT_CONNECTED
+  // ---------------------------------------------------------------------------
+  test("Scenario: 取 commits 但未連接 → GET /commits 回 404 GITHUB_NOT_CONNECTED", async ({
+    page,
+  }) => {
+    test.skip(true, "Wave 0 — 等 F-034b GET /commits 未連接錯誤處理實作完成再啟用");
+
+    // GIVEN 無 github_integrations row
+    await installGithubMock(page, {
+      status: { connected: false },
+      commitsResponse: {
+        status: 404,
+        body: {
+          code: "GITHUB_NOT_CONNECTED",
+          message: "尚未連接 GitHub",
+        },
+      },
+    });
+
+    // WHEN 呼叫 GET /commits
+    const commitsResponse = await page.evaluate(async () => {
+      const res = await fetch("/api/v1/integrations/github/commits?date=2026-04-26", {
+        headers: { "Content-Type": "application/json", "X-API-Key": "mock-key" },
+      });
+      return { status: res.status, body: await res.json() };
+    });
+
+    // THEN status = 404 + code = GITHUB_NOT_CONNECTED
+    expect(commitsResponse.status).toBe(404);
+    expect(commitsResponse.body.code).toBe("GITHUB_NOT_CONNECTED");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Scenario 7: GitHub 暫時不可用 → GET /commits 回 503 GITHUB_UNAVAILABLE
+  // ---------------------------------------------------------------------------
+  test("Scenario: GitHub 暫時不可用 → GET /commits 回 503 GITHUB_UNAVAILABLE", async ({
+    page,
+  }) => {
+    test.skip(true, "Wave 0 — 等 F-034b GitHub 503 / timeout 錯誤處理實作完成再啟用");
+
+    // GIVEN 已連接，但 GitHub API 回 503 或 timeout
+    await installGithubMock(page, {
+      status: { connected: true, username: "testuser", token_set: true },
+      commitsResponse: {
+        status: 503,
+        body: {
+          code: "GITHUB_UNAVAILABLE",
+          message: "GitHub API 暫時無法使用",
+        },
+      },
+    });
+
+    // WHEN 呼叫 GET /commits
+    const commitsResponse = await page.evaluate(async () => {
+      const res = await fetch("/api/v1/integrations/github/commits?date=2026-04-26", {
+        headers: { "Content-Type": "application/json", "X-API-Key": "mock-key" },
+      });
+      return { status: res.status, body: await res.json() };
+    });
+
+    // THEN status = 503 + code = GITHUB_UNAVAILABLE
+    expect(commitsResponse.status).toBe(503);
+    expect(commitsResponse.body.code).toBe("GITHUB_UNAVAILABLE");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Scenario 8: 當日無 commits → GET /commits 回 200 + commits=[] + total=0
+  // ---------------------------------------------------------------------------
+  test("Scenario: 當日無 commits → GET /commits 回 200 + commits=[] + total=0", async ({
+    page,
+  }) => {
+    test.skip(true, "Wave 0 — 等 F-034b GET /commits empty response 實作完成再啟用");
+
+    // GIVEN 已連接，但當日無任何 commits
+    await installGithubMock(page, {
+      status: { connected: true, username: "testuser", token_set: true },
+      commitsResponse: {
+        status: 200,
+        body: {
+          date: TARGET_DATE,
+          username: "testuser",
+          commits: [],
+          total: 0,
+          truncated: false,
+          warning: null,
+        },
+      },
+    });
+
+    // WHEN 呼叫 GET /commits
+    const commitsResponse = await page.evaluate(async () => {
+      const res = await fetch("/api/v1/integrations/github/commits?date=2026-04-26", {
+        headers: { "Content-Type": "application/json", "X-API-Key": "mock-key" },
+      });
+      return { status: res.status, body: await res.json() };
+    });
+
+    // THEN status = 200 + commits = [] + total = 0
+    expect(commitsResponse.status).toBe(200);
+    expect(commitsResponse.body.commits).toEqual([]);
+    expect(commitsResponse.body.total).toBe(0);
+    expect(commitsResponse.body.truncated).toBe(false);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Scenario 9: Journal draft 中 GitHub 失敗 → degraded
+  //   GIVEN 已連接 GitHub，但 GitHub API 暫時 503
+  //   WHEN POST /journal/:date/auto
+  //   THEN response 201（draft 仍生成），warnings 含 GitHub 相關提示，content 不含 ## GitHub 推送
+  // ---------------------------------------------------------------------------
+  test("Scenario: Journal draft 中 GitHub 503 → degraded → 仍回 201，warnings 含 GitHub 錯誤提示", async ({
+    page,
+  }) => {
+    test.skip(true, "Wave 0 — 等 F-034d JournalDraftService degraded 模式實作完成再啟用");
+
+    // GIVEN 已連接，但 GitHub API 暫時不可用
+    await installGithubMock(page, {
+      status: { connected: true, username: "testuser", token_set: true },
+      commitsResponse: {
+        status: 503,
+        body: {
+          code: "GITHUB_UNAVAILABLE",
+          message: "GitHub API 暫時無法使用",
+        },
+      },
+    });
+
+    // journal/auto：draft 仍生成，warnings 含 GitHub 失敗提示，content 不含 ## GitHub 推送
+    await installJournalAutoMock(page, {
+      response: {
+        is_draft: true,
+        content: "今天完成了一些開發工作...",
+        warnings: ["GitHub 暫時無法取得當日 commits，已略過"],
+        source_refs: [],
+      },
+    });
+
+    // WHEN 呼叫 journal/auto
+    const journalAutoResponse = await page.evaluate(async () => {
+      const res = await fetch("/api/v1/journal/2026-04-26/auto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-API-Key": "mock-key" },
+        body: JSON.stringify({ tone: "reflective" }),
+      });
+      return res.json();
+    });
+
+    // THEN draft 仍生成（status = 201 由 mock 保證，body.is_draft = true）
+    expect(journalAutoResponse.is_draft).toBe(true);
+    // THEN warnings 包含 GitHub 相關錯誤提示
+    expect(journalAutoResponse.warnings).toEqual(
+      expect.arrayContaining([expect.stringMatching(/GitHub/i)]),
+    );
+    // THEN content 不含 ## GitHub 推送（degraded 不加入 commits 區塊）
+    expect(journalAutoResponse.content).not.toContain("## GitHub 推送");
   });
 });

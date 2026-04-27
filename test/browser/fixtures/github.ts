@@ -10,34 +10,39 @@
 import type { Page, Route } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
-// data-testid 常數（對應 dev/frontend/lib/github/testids.ts）
+// data-testid 常數（對齊 dev/frontend/lib/github/testids.ts GITHUB_TESTIDS）
 // ---------------------------------------------------------------------------
 
 export const GITHUB_SETTINGS_TESTIDS = {
-  // 設定頁面 GitHub 區塊
-  section: "github-settings-section",
+  // 側邊欄導航連結
+  navGithub: "nav-github",
 
-  // 未連接狀態
-  notConnectedState: "github-settings-not-connected",
-  patInput: "github-settings-pat-input",
-  connectButton: "github-settings-connect-button",
+  // 連接狀態 badge（已連接 / 未連接）
+  statusBadge: "github-status-badge",
 
-  // 已連接狀態
-  connectedState: "github-settings-connected",
-  usernameLabel: "github-settings-username",
-  lastSyncedLabel: "github-settings-last-synced",
-  lastErrorBanner: "github-settings-last-error-banner",
-  disconnectButton: "github-settings-disconnect-button",
+  // PAT 輸入欄位
+  patInput: "github-token-input",
 
-  // 中斷確認 Dialog
-  disconnectDialog: "github-settings-disconnect-dialog",
-  disconnectDialogConfirm: "github-settings-disconnect-dialog-confirm",
-  disconnectDialogCancel: "github-settings-disconnect-dialog-cancel",
+  // 「連接」按鈕
+  connectButton: "github-connect-button",
 
-  // Toast / Banner
-  toastConnected: "github-settings-toast-connected",
-  toastDisconnected: "github-settings-toast-disconnected",
-  toastError: "github-settings-toast-error",
+  // 「中斷連接」按鈕
+  disconnectButton: "github-disconnect-button",
+
+  // AlertDialog 內的「確認中斷」按鈕
+  disconnectDialogConfirm: "github-disconnect-confirm-button",
+
+  // 已連接時顯示的 GitHub username
+  usernameLabel: "github-username-display",
+
+  // ConnectForm submit 失敗時的即時錯誤訊息
+  errorMessage: "github-error-message",
+
+  // 已連接狀態下 status.last_error 的顯示訊息
+  lastErrorMessage: "github-last-error-message",
+
+  // 已連接時「更新 PAT」場景的 submit 按鈕
+  updatePatButton: "github-update-pat-button",
 } as const;
 
 export const GITHUB_JOURNAL_TESTIDS = {
@@ -188,7 +193,7 @@ export async function installGithubMock(
     }
 
     // DELETE /integrations/github（精確匹配，避免吃到 /status 等子路由）
-    if (method === "DELETE" && /\/integrations\/github(\?|$|\/?$)/.test(url)) {
+    if (method === "DELETE" && /\/integrations\/github\/?$/.test(url)) {
       const resp = opts.deleteResponse ?? { status: 204 };
       if (resp.status === 204) {
         await route.fulfill({
@@ -224,6 +229,8 @@ export interface MockJournalAutoResponse {
 
 export interface InstallJournalAutoMockOpts {
   response: MockJournalAutoResponse;
+  /** HTTP status code，預設 201 */
+  status?: number;
   recorder?: {
     requests: Array<{ url: string; method: string; body?: unknown }>;
   };
@@ -245,7 +252,7 @@ export async function installJournalAutoMock(
       opts.recorder.requests.push({ url: req.url(), method: req.method(), body });
     }
     await route.fulfill({
-      status: 201,
+      status: opts.status ?? 201,
       headers: { "content-type": "application/json" },
       body: JSON.stringify(opts.response),
     });
