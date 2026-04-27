@@ -3,7 +3,7 @@
  *
  * 對應後端 F-034a 的 /api/v1/integrations/github/* 端點
  * 422 → GITHUB_TOKEN_INVALID / GITHUB_TOKEN_INSUFFICIENT_SCOPE
- * 403 → 權限不足（insufficient scope）
+ * 403 → GitHub 拒絕請求（IP 限制或其他權限問題）
  * 503 → GITHUB_UNAVAILABLE
  */
 
@@ -55,13 +55,13 @@ export function formatGithubError(err: unknown): string {
     case "GITHUB_TOKEN_INVALID":
       return "PAT 無效，請確認 token 是否正確";
     case "GITHUB_TOKEN_INSUFFICIENT_SCOPE":
-      return "PAT 缺少必要權限：repo, read:user";
+      return "PAT 缺少 scopes，需要 repo + read:user";
     case "GITHUB_UNAVAILABLE":
       return "GitHub 服務暫時無法連線，請稍後再試";
     default:
       // 依 HTTP status 給友善訊息
       if (err.status === 422) return "PAT 無效，請確認 token 是否正確";
-      if (err.status === 403) return "PAT 缺少必要權限：repo, read:user";
+      if (err.status === 403) return "GitHub 拒絕請求（可能是 IP 限制或權限問題）";
       if (err.status === 503) return "GitHub 服務暫時無法連線，請稍後再試";
       return err.message || "操作失敗，請稍後再試";
   }

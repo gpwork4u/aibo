@@ -25,6 +25,12 @@ export const GITHUB_TESTIDS = {
   /** 已連接時顯示的 GitHub username */
   USERNAME_DISPLAY: "github-username-display",
 
-  /** 錯誤訊息區塊 */
+  /** ConnectForm submit 失敗時的即時錯誤訊息 */
   ERROR_MESSAGE: "github-error-message",
+
+  /** 已連接狀態下 status.last_error 的顯示訊息 */
+  LAST_ERROR_MESSAGE: "github-last-error-message",
+
+  /** 已連接時「更新 PAT」場景的 submit 按鈕 */
+  UPDATE_PAT_BUTTON: "github-update-pat-button",
 } as const;

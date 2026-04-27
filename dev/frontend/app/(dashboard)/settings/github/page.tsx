@@ -250,7 +250,7 @@ function ConnectedSection({
       {status.last_error && (
         <p
           className="text-sm text-destructive"
-          data-testid={GITHUB_TESTIDS.ERROR_MESSAGE}
+          data-testid={GITHUB_TESTIDS.LAST_ERROR_MESSAGE}
         >
           上次錯誤：{status.last_error}
         </p>
@@ -285,6 +285,7 @@ function ConnectedSection({
           onSubmit={onConnect}
           isPending={isPending}
           submitLabel="更新 PAT"
+          submitTestId={GITHUB_TESTIDS.UPDATE_PAT_BUTTON}
         />
       )}
     </div>
@@ -299,6 +300,7 @@ function ConnectForm({
   onSubmit,
   isPending,
   submitLabel = "連接",
+  submitTestId = GITHUB_TESTIDS.CONNECT_BUTTON,
 }: {
   token: string;
   onTokenChange: (v: string) => void;
@@ -306,6 +308,7 @@ function ConnectForm({
   onSubmit: (e: React.FormEvent) => void;
   isPending: boolean;
   submitLabel?: string;
+  submitTestId?: string;
 }) {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -349,7 +352,7 @@ function ConnectForm({
       <Button
         type="submit"
         disabled={isPending || !token.trim()}
-        data-testid={GITHUB_TESTIDS.CONNECT_BUTTON}
+        data-testid={submitTestId}
       >
         {isPending ? "連接中…" : submitLabel}
       </Button>
