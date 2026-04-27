@@ -28,7 +28,7 @@ const (
 	ErrCodeGitHubTokenInvalid = "GITHUB_TOKEN_INVALID"
 
 	// ErrCodeGitHubInsufficientScope PAT 缺少必要 scopes
-	ErrCodeGitHubInsufficientScope = "GITHUB_INSUFFICIENT_SCOPE"
+	ErrCodeGitHubInsufficientScope = "GITHUB_TOKEN_INSUFFICIENT_SCOPE"
 
 	// ErrCodeGitHubUnavailable GitHub API 無法連線（503）
 	ErrCodeGitHubUnavailable = "GITHUB_UNAVAILABLE"
