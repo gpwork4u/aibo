@@ -2,8 +2,69 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================================
+ * F-035 Design Tokens — Editorial 紙本風格
+ *
+ * 三套字體：--sans / --serif / --mono（由 next/font 注入）
+ * 三主題：light（預設）/ dark / system
+ *   - .dark class on <html> → 強制 dark
+ *   - 無 class 時，@media (prefers-color-scheme: dark) 自動套用 dark
+ *
+ * Token 命名（editorial）：
+ *   --paper / --paper-2 / --paper-3   背景紙感層次
+ *   --ink / --ink-2 / --ink-3 / --ink-4  文字 / icon 階層
+ *   --accent / --accent-2 / --accent-soft  品牌色
+ *   --rule / --rule-2  分隔線、邊框
+ *   --surface  卡片表面（sub-paper）
+ *
+ * 同時保留 shadcn HSL 變數作為相容層（既有元件持續可用）。
+ * ========================================================================== */
+
 @layer base {
-  :root {
+  :root,
+  :root.light {
+    /* === Editorial tokens (light) === */
+    --paper: #eef1f6;
+    --paper-2: #e3e8ef;
+    --paper-3: #d3dae4;
+    --surface: #ffffff;
+    --ink: #0b1220;
+    --ink-2: #1c2433;
+    --ink-3: #5a6577;
+    --ink-4: #8a93a3;
+    --rule: rgba(11, 18, 32, 0.06);
+    --rule-2: rgba(11, 18, 32, 0.10);
+    --accent: #3b6dff;
+    --accent-2: #7a9bff;
+    --accent-soft: rgba(59, 109, 255, 0.08);
+    --accent-glow:
+      0 0 0 4px rgba(59, 109, 255, 0.10),
+      0 6px 20px rgba(59, 109, 255, 0.18);
+
+    /* === Radii === */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-pill: 999px;
+
+    /* === Z-index 層級 === */
+    --z-base: 0;
+    --z-dropdown: 1000;
+    --z-sticky: 1100;
+    --z-popover: 1200;
+    --z-modal: 1300;
+    --z-tooltip: 1400;
+    --z-toast: 1500;
+
+    /* === Shadows === */
+    --shadow-sm: 0 1px 2px rgba(11, 18, 32, 0.04);
+    --shadow-md: 0 4px 12px rgba(11, 18, 32, 0.06);
+    --shadow-lg: 0 12px 28px rgba(11, 18, 32, 0.10);
+
+    /* ============================================================
+     * shadcn 相容層（HSL）— 既有元件持續仰賴這些變數
+     * ============================================================ */
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
 
@@ -19,7 +80,6 @@
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
 
-    --accent: 240 4.8% 95.9%;
     --accent-foreground: 240 5.9% 10%;
 
     --muted: 240 4.8% 95.9%;
@@ -50,41 +110,123 @@
     --sidebar-ring: 240 5.9% 10%;
   }
 
-  .dark {
+  /* ============================================================
+   * Dark theme（透過 .dark class 或系統偏好）
+   * 順序很重要：先寫 system-preference fallback，
+   * 再寫顯式 .dark / .light class 以覆寫之。
+   * ============================================================ */
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) {
+      --paper: #0b0f17;
+      --paper-2: #131826;
+      --paper-3: #1d2334;
+      --surface: #161c2a;
+      --ink: #e7ecf5;
+      --ink-2: #c8d0de;
+      --ink-3: #8a93a3;
+      --ink-4: #5a6577;
+      --rule: rgba(231, 236, 245, 0.06);
+      --rule-2: rgba(231, 236, 245, 0.12);
+      --accent: #6f93ff;
+      --accent-2: #a3bbff;
+      --accent-soft: rgba(111, 147, 255, 0.14);
+      --accent-glow:
+        0 0 0 4px rgba(111, 147, 255, 0.18),
+        0 6px 20px rgba(111, 147, 255, 0.28);
+
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.50);
+      --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.60);
+
+      --background: 240 10% 3.9%;
+      --foreground: 0 0% 98%;
+
+      --card: 240 10% 3.9%;
+      --card-foreground: 0 0% 98%;
+
+      --popover: 240 10% 3.9%;
+      --popover-foreground: 0 0% 98%;
+
+      --primary: 0 0% 98%;
+      --primary-foreground: 240 5.9% 10%;
+
+      --secondary: 240 3.7% 15.9%;
+      --secondary-foreground: 0 0% 98%;
+
+      --accent-foreground: 0 0% 98%;
+
+      --muted: 240 3.7% 15.9%;
+      --muted-foreground: 240 5% 64.9%;
+
+      --destructive: 0 62.8% 30.6%;
+      --destructive-foreground: 0 0% 98%;
+
+      --warning: 38 92% 50%;
+      --warning-foreground: 38 92% 14%;
+
+      --success: 142 76% 36%;
+      --success-foreground: 0 0% 98%;
+
+      --border: 240 3.7% 15.9%;
+      --input: 240 3.7% 15.9%;
+      --ring: 240 4.9% 83.9%;
+
+      --sidebar-background: 240 5.9% 10%;
+      --sidebar-foreground: 240 4.8% 95.9%;
+      --sidebar-primary: 0 0% 98%;
+      --sidebar-primary-foreground: 240 5.9% 10%;
+      --sidebar-accent: 240 3.7% 15.9%;
+      --sidebar-accent-foreground: 240 4.8% 95.9%;
+      --sidebar-border: 240 3.7% 15.9%;
+      --sidebar-ring: 240 4.9% 83.9%;
+    }
+  }
+
+  /* 顯式 .dark class（覆寫系統偏好） */
+  :root.dark {
+    --paper: #0b0f17;
+    --paper-2: #131826;
+    --paper-3: #1d2334;
+    --surface: #161c2a;
+    --ink: #e7ecf5;
+    --ink-2: #c8d0de;
+    --ink-3: #8a93a3;
+    --ink-4: #5a6577;
+    --rule: rgba(231, 236, 245, 0.06);
+    --rule-2: rgba(231, 236, 245, 0.12);
+    --accent: #6f93ff;
+    --accent-2: #a3bbff;
+    --accent-soft: rgba(111, 147, 255, 0.14);
+    --accent-glow:
+      0 0 0 4px rgba(111, 147, 255, 0.18),
+      0 6px 20px rgba(111, 147, 255, 0.28);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.50);
+    --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.60);
+
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
-
     --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
-
     --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
-
     --primary: 0 0% 98%;
     --primary-foreground: 240 5.9% 10%;
-
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
-
-    --accent: 240 3.7% 15.9%;
     --accent-foreground: 0 0% 98%;
-
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
-
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-
     --warning: 38 92% 50%;
     --warning-foreground: 38 92% 14%;
-
     --success: 142 76% 36%;
     --success-foreground: 0 0% 98%;
-
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
-
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 0 0% 98%;

@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Lora } from "next/font/google";
 import { Providers } from "@/lib/providers";
-import { Toaster } from "@/components/ui/sonner";
+import { ThemeScript } from "@/components/theme/theme-script";
 import "./globals.css";
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
+  display: "swap",
+});
+
+const lora = Lora({
+  subsets: ["latin"],
+  variable: "--font-serif",
   display: "swap",
 });
 
@@ -26,11 +32,14 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-Hant" suppressHydrationWarning>
+      <head>
+        {/* F-035：在 hydration 前同步套用 light/dark class，避免 FOUC */}
+        <ThemeScript />
+      </head>
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+        className={`${inter.variable} ${lora.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
         <Providers>{children}</Providers>
-        <Toaster />
       </body>
     </html>
   );
