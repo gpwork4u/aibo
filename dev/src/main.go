@@ -153,8 +153,13 @@ func main() {
 	taskSvc := service.NewTaskService(taskRepo, projectRepo, entryRepo, journalRepo, projectSvc)
 	taskHandler := handler.NewTaskHandler(taskSvc, projectSvc)
 
+	// 初始化 GitHub 整合服務（F-034a：connect / status / disconnect）
+	githubIntegrationRepo := repository.NewGitHubIntegrationRepository(pool)
+	githubIntegrationSvc := service.NewGitHubIntegrationService(githubIntegrationRepo, aesCrypto)
+	githubIntegrationHandler := handler.NewGitHubIntegrationHandler(githubIntegrationSvc)
+
 	// 設定路由
-	r := router.Setup(pool, apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, journalAutoHandler, projectHandler, taskHandler)
+	r := router.Setup(pool, apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, journalAutoHandler, projectHandler, taskHandler, githubIntegrationHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
