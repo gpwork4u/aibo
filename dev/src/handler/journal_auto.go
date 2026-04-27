@@ -124,5 +124,16 @@ func (h *JournalAutoHandler) AutoGenerate(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, toJournalResponse(created, createdRefs))
+	journalResp := toJournalResponse(created, createdRefs)
+	if len(draft.Warnings) > 0 {
+		c.JSON(http.StatusCreated, journalAutoResponse{JournalResponse: journalResp, Warnings: draft.Warnings})
+		return
+	}
+	c.JSON(http.StatusCreated, journalResp)
+}
+
+// journalAutoResponse 帶有 warnings 的 auto 生成回應（warnings 欄位向後相容）
+type journalAutoResponse struct {
+	dto.JournalResponse
+	Warnings []string `json:"warnings,omitempty"`
 }

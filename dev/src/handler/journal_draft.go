@@ -28,6 +28,7 @@ type JournalDraftResponse struct {
 	UsedRefs    []string `json:"used_refs,omitempty"`
 	Mood        string   `json:"mood,omitempty"`
 	GeneratedBy string   `json:"generated_by"`
+	Warnings    []string `json:"warnings,omitempty"`
 }
 
 // Draft POST /api/v1/journal/:date/draft
@@ -75,5 +76,6 @@ func (h *JournalDraftHandler) Draft(c *gin.Context) {
 		UsedRefs:    result.UsedRefs,
 		Mood:        result.Mood,
 		GeneratedBy: result.GeneratedBy,
+		Warnings:    result.Warnings,
 	})
 }
