@@ -65,6 +65,22 @@
 | F-030 | Google Calendar 整合強化 | Sprint 9 | P1 | `specs/features/f030-gcal-enhancements.md` |
 | F-031 | 專案與任務管理（後端） | Sprint 10 | P0 | `specs/features/f031-projects-tasks.md` |
 | F-032 | 專案管理前端頁面 | Sprint 10 | P0 | `specs/features/f032-projects-frontend.md` |
+| F-035 | Design Tokens & Theme | Sprint 13 | P0 | `specs/features/f035-design-tokens-theme.md` |
+| F-036 | App Shell + Routing | Sprint 13 | P0 | `specs/features/f036-app-shell-routing.md` |
+| F-037 | Command Palette Skeleton | Sprint 13 | P0 | `specs/features/f037-command-palette-skeleton.md` |
+| F-038 | shadcn Primitives（紙本主題） | Sprint 13 | P0 | `specs/features/f038-shadcn-primitives.md` |
+| F-039 | API SSE Auth（Cookie Session） | Sprint 13 | P0 | `specs/features/f039-api-sse-auth.md` |
+| F-040 | Inbox Triage | Sprint 14 | P0 | `specs/features/f040-inbox-triage.md` |
+| F-041 | Library Table | Sprint 14 | P0 | `specs/features/f041-library-table.md` |
+| F-042 | Today Dashboard | Sprint 14 | P0 | `specs/features/f042-today-dashboard.md` |
+| F-043 | Saved Views & Filter Bar | Sprint 14 | P1 | `specs/features/f043-saved-views-filter-bar.md` |
+| F-044 | Entry Links Backend | Sprint 15 | P0 | `specs/features/f044-entry-links-backend.md` |
+| F-045 | Canvas Graph View | Sprint 15 | P1 | `specs/features/f045-canvas-graph-view.md` |
+| F-046 | Relation Editor | Sprint 15 | P1 | `specs/features/f046-relation-editor.md` |
+| F-047 | Copilot Side Panel（前端） | Sprint 16 | P0 | `specs/features/f047-copilot-side-panel.md` |
+| F-048 | Copilot Backend SSE | Sprint 16 | P0 | `specs/features/f048-copilot-backend-sse.md` |
+| F-049 | CmdK Power Actions | Sprint 16 | P0 | `specs/features/f049-cmdk-power-actions.md` |
+| F-050 | Keyboard Shortcuts | Sprint 16 | P1 | `specs/features/f050-keyboard-shortcuts.md` |
 
 ## Sprint 規劃
 
@@ -111,6 +127,30 @@
 ### Sprint 10：專案管理
 - F-031 專案與任務管理（後端，含 Project / Task / refs）
 - F-032 專案管理前端頁面（Kanban + List + RefsPicker）
+
+### Sprint 13：Visual Foundation（UI 改造第 1 波）
+- F-035 Design Tokens & Theme（OKLCH editorial 紙本系統）
+- F-038 shadcn Primitives（紙本主題覆蓋）
+- F-039 API SSE Auth（Cookie Session + SSE skeleton）
+- F-036 App Shell + Routing（shell layout + 深連結子路由）
+- F-037 Command Palette Skeleton（⌘K + 基礎導航）
+
+### Sprint 14：Core Views（UI 改造第 2 波）
+- F-040 Inbox Triage（editorial 視覺 + 批次操作 + 鍵盤）
+- F-041 Library Table（TanStack Table + 虛擬化 + URL 同步過濾）
+- F-042 Today Dashboard（聚合視圖：journal / calendar / tasks / entries）
+- F-043 Saved Views & Filter Bar（自定義視圖儲存）
+
+### Sprint 15：Knowledge Graph（UI 改造第 3 波）
+- F-044 Entry Links Backend（entry_links table + CRUD API）
+- F-045 Canvas Graph View（React Flow 知識圖譜）
+- F-046 Relation Editor（inline 連結管理）
+
+### Sprint 16：Copilot & Power UX（UI 改造第 4 波）
+- F-047 Copilot Side Panel（前端 SSE EventSource + streaming UI）
+- F-048 Copilot Backend SSE（完整 LLM streaming + context 注入）
+- F-049 CmdK Power Actions（搜尋 + 建立 + AI actions）
+- F-050 Keyboard Shortcuts（全域 + 情境快捷鍵系統）
 
 ## 非功能需求
 

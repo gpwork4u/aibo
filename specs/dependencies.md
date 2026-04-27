@@ -714,3 +714,298 @@ F-026a → F-026b → F-027a → F-027c → QA-08 完整 e2e
 | Gcal upstream 不穩 | 整頁失敗 | Degraded response（HTTP 200 + `X-Degraded: gcal`） |
 | Migration 012 unique index 與既有 gcal entries 衝突 | migration 失敗 | up.sql 前置 cleanup query 保留最早一筆 |
 | 使用者尚未連 gcal 每次 424 | 首次體驗差 | 前端以 `include_gcal=false` 預查一次、後端 422 改用 200 + `gcal_connected=false` flag（保留 424 給明確要 include_gcal=true 時） |
+
+---
+
+# Sprint 13 依賴圖譜：Visual Foundation
+
+## 功能總覽
+
+| 編號 | 名稱 | 優先級 | 工作量 |
+|------|------|--------|-------|
+| F-035 | Design Tokens & Theme | P0 | 中（CSS variables + ThemeProvider） |
+| F-038 | shadcn Primitives | P0 | 中（12 primitives 主題覆蓋） |
+| F-039 | API SSE Auth | P0 | 大（DB migration + middleware + handlers） |
+| F-036 | App Shell + Routing | P0 | 大（route group + parallel routes + layout） |
+| F-037 | Command Palette Skeleton | P0 | 小（cmdk + 導航 actions） |
+
+## 依賴關係
+
+```
+F-035 (Design Tokens)  ─── 無前置依賴（純 CSS）
+  └──► F-038 (shadcn Primitives)  ─── 依賴 F-035 CSS variables
+         └──► F-036 (App Shell)   ─── 依賴 F-038 Button/Badge 等
+                └──► F-037 (CmdK) ─── 依賴 F-036 shell layout + F-038 Command primitive
+
+F-039 (API SSE Auth)   ─── 無前置依賴（後端，與前端並行）
+```
+
+## 拓撲排序
+
+### Wave 0（並行起跑）
+- **F-035**: Design Tokens（純 CSS，無依賴）
+- **F-039**: API SSE Auth（純後端，無依賴）
+- **D-13**: UI Design Dataset（根據 token 定義設計元件規格）
+- **QA-13**: 撰寫 e2e skeleton
+
+### Wave 1（F-035 完成後）
+- **F-038**: shadcn Primitives（依賴 F-035 CSS variables）
+
+### Wave 2（F-038 完成後）
+- **F-036**: App Shell + Routing（依賴 F-038 元件）
+
+### Wave 3（F-036 完成後）
+- **F-037**: Command Palette Skeleton（依賴 F-036 shell layout）
+
+## 並行策略
+
+```
+時間線 ->
+
+Wave 0:  [F-035 Design Tokens ──────]  [F-039 API SSE Auth ──────────────────]
+         [D-13 UI Design ──────────────────────────────]
+         [QA-13 e2e skeleton ─────────────────────────────────────────────────]
+
+Wave 1:               [F-038 shadcn Primitives ──────]
+
+Wave 2:                              [F-036 App Shell ─────────────]
+
+Wave 3:                                                 [F-037 CmdK ──]
+
+Code Review:  [逐 PR 審查 ─────────────────────────────────────────────────────]
+```
+
+## 關鍵路徑
+
+F-035 → F-038 → F-036 → F-037
+
+F-039 為後端，可與前端 wave 完全並行。
+
+## 風險項目
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| Tailwind v4 @theme 語法與 shadcn CLI 不相容 | 元件樣式錯亂 | F-035 完成後立即驗證 shadcn CLI 輸出 |
+| Next.js parallel routes HMR 不穩定 | 開發效率下降 | 先完成靜態 layout，最後才加 parallel routes |
+| CookieAuth middleware 與既有 X-API-Key 衝突 | 現有 API 中斷 | middleware 採 fallback 策略，不改變現有行為 |
+| F-039 router wiring 未在 Sprint 13 完成 | SSE 端點無法呼叫 | 標記為 skeleton，Sprint 14 補上 router wiring |
+
+---
+
+# Sprint 14 依賴圖譜：Core Views
+
+## 功能總覽
+
+| 編號 | 名稱 | 優先級 | 工作量 |
+|------|------|--------|-------|
+| F-040 | Inbox Triage | P0 | 大（新後端 batch API + 前端改造） |
+| F-041 | Library Table | P0 | 大（TanStack Table + 虛擬化 + URL 同步） |
+| F-042 | Today Dashboard | P0 | 中（聚合多資料源，無新後端） |
+| F-043 | Saved Views & Filter Bar | P1 | 中（新後端 saved_views + 前端 sidebar） |
+
+## 依賴關係
+
+```
+Sprint 13 已完成：
+├── F-035 Design Tokens（CSS variables）
+├── F-036 App Shell（shell layout + 路由）
+├── F-037 CmdK（skeleton）
+├── F-038 shadcn Primitives（Button/Input/Sheet/Select 等）
+└── F-039 API SSE Auth（skeleton，router wiring 待補）
+
+Sprint 14 功能依賴：
+
+F-040 (Inbox Triage)
+├── 前端：依賴 F-036 shell / F-038 primitives
+└── 後端：新增 POST /api/v1/entries/batch endpoint（migration 不需要）
+
+F-041 (Library Table)
+├── 前端：依賴 F-036 shell / F-038 primitives
+└── 後端：沿用既有 GET /api/v1/entries（無新 API）
+
+F-042 (Today Dashboard)
+├── 前端：依賴 F-036 shell / F-038 primitives
+└── 後端：沿用現有 journal/calendar/tasks/entries API（無新 API）
+
+F-043 (Saved Views)
+├── 前端：依賴 F-036 shell（sidebar 新增 Views 區塊）
+└── 後端：新增 saved_views table（migration 018）+ CRUD API
+```
+
+## 依賴說明
+
+- **F-040、F-041、F-042 可完全並行**：三者無互相依賴，只共用 Sprint 13 基礎
+- **F-043 略有依賴**：Saved Views 的 Filter 參數格式與 F-041 Library 過濾一致，建議 F-041 介面先定義，F-043 後跟進
+- **F-039 router wiring** 需在 Sprint 14 Wave 0 補上，才能讓前端 cookie auth 正常運作
+
+## 拓撲排序
+
+### Wave 0（先行）
+- **F-039 router wiring**：補上 Sprint 13 未完成的 router 註冊（small fix，blocking for cookie auth）
+- **QA-14**: 撰寫 e2e skeleton
+
+### Wave 1（F-039 wiring 完成後，可並行）
+- **F-040**: Inbox Triage（後端 batch API + 前端改造）
+- **F-041**: Library Table（前端改造，無新後端）
+- **F-042**: Today Dashboard（前端聚合，無新後端）
+
+### Wave 2（F-041 介面定義後）
+- **F-043**: Saved Views（後端 migration + CRUD + 前端 sidebar）
+
+## 並行策略
+
+```
+時間線 ->
+
+Wave 0:  [F-039 router wiring ──]
+         [QA-14 e2e skeleton ──────────────────────────────────────────]
+
+Wave 1:           [F-040 Inbox Triage ──────────────────────]
+                  [F-041 Library Table ────────────────────────────────]
+                  [F-042 Today Dashboard ────────────────]
+
+Wave 2:                    [F-043 Saved Views ─────────────────────]
+
+Code Review:  [逐 PR 審查 ─────────────────────────────────────────────]
+```
+
+## 關鍵路徑
+
+F-039 wiring → F-041（最長）→ F-043
+
+## 風險項目
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| TanStack Virtual + 大量資料效能 | Library 卡頓 | 先實作非虛擬化版本，確認功能後再加虛擬化 |
+| Today Dashboard 多 API 並行失敗處理 | 部分 section 白屏 | 各 section 獨立 error boundary |
+| F-043 filter JSON schema 不夠彈性 | 未來擴展困難 | JSONB 無固定 schema，保留彈性 |
+
+---
+
+# Sprint 15 依賴圖譜：Knowledge Graph
+
+## 功能總覽
+
+| 編號 | 名稱 | 優先級 | 工作量 |
+|------|------|--------|-------|
+| F-044 | Entry Links Backend | P0 | 中（migration + CRUD API） |
+| F-045 | Canvas Graph View | P1 | 大（React Flow + ELK layout + graph API） |
+| F-046 | Relation Editor | P1 | 中（UI 嵌入 entry detail + Combobox 搜尋） |
+
+## 依賴關係
+
+```
+F-044 (Entry Links Backend)  ─── 無前置依賴（新 DB table + API）
+  ├──► F-045 (Canvas Graph View)  ─── 依賴 F-044 + 新 GET /api/v1/graph endpoint
+  └──► F-046 (Relation Editor)    ─── 依賴 F-044 CRUD API
+
+F-045 和 F-046 互相獨立（F-044 完成後可並行）
+```
+
+## 拓撲排序
+
+### Wave 0（先行）
+- **F-044**: Entry Links Backend（migration 019 + CRUD API）
+- **QA-15**: 撰寫 e2e skeleton
+
+### Wave 1（F-044 完成後，可並行）
+- **F-045**: Canvas Graph View（新增 GET /api/v1/graph + React Flow 前端）
+- **F-046**: Relation Editor（嵌入 entry detail，使用 F-044 CRUD API）
+
+## 並行策略
+
+```
+時間線 ->
+
+Wave 0:  [F-044 Entry Links Backend ──────────]
+         [QA-15 e2e skeleton ──────────────────────────────────────────]
+
+Wave 1:                  [F-045 Canvas Graph View ─────────────────────]
+                         [F-046 Relation Editor ───────────────────────]
+
+Code Review:  [逐 PR 審查 ─────────────────────────────────────────────]
+```
+
+## 關鍵路徑
+
+F-044 → F-045（React Flow 工作量最大）
+
+## 風險項目
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| ELK.js WASM 在 Next.js 載入慢 | Canvas 首次渲染延遲 | 動態 import + loading skeleton |
+| React Flow 大節點數效能（> 100） | 圖譜卡頓 | limit=50 預設，超過 200 降級 dot-only |
+| entry_links ENUM 未來擴展 | 需要 migration | 預先在 ENUM 中保留 related_to 作為通用 fallback |
+
+---
+
+# Sprint 16 依賴圖譜：Copilot & Power UX
+
+## 功能總覽
+
+| 編號 | 名稱 | 優先級 | 工作量 |
+|------|------|--------|-------|
+| F-048 | Copilot Backend SSE | P0 | 大（DB migration + LLM streaming + context 組裝） |
+| F-047 | Copilot Side Panel | P0 | 大（EventSource + streaming UI + zustand state） |
+| F-049 | CmdK Power Actions | P0 | 中（延伸 F-037 + QuickCreateModal + AI actions） |
+| F-050 | Keyboard Shortcuts | P1 | 小（hook + ShortcutsModal） |
+
+## 依賴關係
+
+```
+F-048 (Copilot Backend SSE)  ─── 無前置依賴（後端，migration 020）
+  └──► F-047 (Copilot Side Panel) ─── 依賴 F-048 完整 SSE（F-039 skeleton 已有 ping）
+
+F-037 (CmdK Skeleton, Sprint 13)
+  └──► F-049 (CmdK Power Actions) ─── 延伸 F-037
+
+F-050 (Keyboard Shortcuts)  ─── 依賴 F-036 shell / F-040 Inbox / F-041 Library 介面已定義
+```
+
+## 依賴說明
+
+- **F-047 與 F-048 強耦合**：前端 EventSource 串接後端 SSE token stream。F-048 需先完成，F-047 才能做完整 streaming 測試
+- **F-047 可以 ping-only 模式先開發**：F-039 的 ping SSE 即可驗證 EventSource 連線邏輯
+- **F-049 與 F-047 獨立**：CmdK power actions 中的 "AI actions" 只是開啟 Copilot Panel + 預填文字，不直接呼叫 SSE
+- **F-050 完全獨立**：只依賴已完成的 UI 元件和路由
+
+## 拓撲排序
+
+### Wave 0（並行起跑）
+- **F-048**: Copilot Backend SSE（migration + LlmService 串接 + streaming handler）
+- **F-049**: CmdK Power Actions（延伸 F-037，前端，無後端依賴）
+- **F-050**: Keyboard Shortcuts（純前端 hook）
+- **QA-16**: 撰寫 e2e skeleton
+
+### Wave 1（F-048 完成後）
+- **F-047**: Copilot Side Panel（完整 EventSource + streaming UI）
+
+## 並行策略
+
+```
+時間線 ->
+
+Wave 0:  [F-048 Copilot Backend SSE ─────────────────────────────]
+         [F-049 CmdK Power Actions ─────────────────]
+         [F-050 Keyboard Shortcuts ──────────]
+         [QA-16 e2e skeleton ──────────────────────────────────────────]
+
+Wave 1:                        [F-047 Copilot Side Panel ─────────────]
+
+Code Review:  [逐 PR 審查 ─────────────────────────────────────────────]
+```
+
+## 關鍵路徑
+
+F-048 → F-047（完整 streaming 測試需要 F-048）
+
+## 風險項目
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| LLM streaming token 斷行 / Unicode 截斷 | 顯示亂碼 | 後端以 UTF-8 word boundary 分割 token |
+| SSE 連線在代理（Nginx）後被 buffered | 前端無法即時收到 token | 後端設定 `X-Accel-Buffering: no` header |
+| zustand state 跨路由 hydration 問題 | Panel 狀態重置 | store 初始化在 shell layout，非 page component |
+| CmdK batch classify 大量 inbox items | 請求超時 | 後端非同步處理，前端 progress polling |
