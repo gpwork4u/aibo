@@ -1,7 +1,7 @@
 "use client";
 
 import { Menu, Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/theme/theme-provider";
 import { Button } from "@/components/ui/button";
 
 interface AppHeaderProps {

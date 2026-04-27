@@ -16,9 +16,29 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["var(--font-sans)"],
+        serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
       },
       colors: {
+        /* === F-035 Editorial tokens === */
+        paper: {
+          DEFAULT: "var(--paper)",
+          2: "var(--paper-2)",
+          3: "var(--paper-3)",
+        },
+        surface: "var(--surface)",
+        ink: {
+          DEFAULT: "var(--ink)",
+          2: "var(--ink-2)",
+          3: "var(--ink-3)",
+          4: "var(--ink-4)",
+        },
+        rule: {
+          DEFAULT: "var(--rule)",
+          2: "var(--rule-2)",
+        },
+        "accent-soft": "var(--accent-soft)",
+        "accent-2": "var(--accent-2)",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -75,6 +95,27 @@ const config: Config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        /* F-035 editorial radii */
+        "ed-sm": "var(--radius-sm)",
+        "ed-md": "var(--radius-md)",
+        "ed-lg": "var(--radius-lg)",
+        "ed-xl": "var(--radius-xl)",
+        pill: "var(--radius-pill)",
+      },
+      boxShadow: {
+        "ed-sm": "var(--shadow-sm)",
+        "ed-md": "var(--shadow-md)",
+        "ed-lg": "var(--shadow-lg)",
+        glow: "var(--accent-glow)",
+      },
+      zIndex: {
+        base: "var(--z-base)",
+        dropdown: "var(--z-dropdown)",
+        sticky: "var(--z-sticky)",
+        popover: "var(--z-popover)",
+        modal: "var(--z-modal)",
+        tooltip: "var(--z-tooltip)",
+        toast: "var(--z-toast)",
       },
       keyframes: {
         "accordion-down": {
