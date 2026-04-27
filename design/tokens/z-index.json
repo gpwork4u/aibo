@@ -1,0 +1,18 @@
+{
+  "_comment": "aibo Z-Index Tokens (Sprint 13)\nClear stacking context hierarchy.",
+
+  "zIndex": {
+    "base":     "0",
+    "raised":   "10",
+    "dropdown": "100",
+    "sticky":   "200",
+    "topbar":   "300",
+    "sidebar":  "300",
+    "popover":  "400",
+    "overlay":  "500",
+    "modal":    "600",
+    "toast":    "700",
+    "tooltip":  "800",
+    "cmdk":     "900"
+  }
+}

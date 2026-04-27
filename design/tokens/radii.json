@@ -1,0 +1,31 @@
+{
+  "_comment": "aibo Border Radius Tokens (Sprint 13)\nEditorial style: subtle rounding, not pill-heavy.",
+
+  "radius": {
+    "none": "0",
+    "sm":   "0.25rem",
+    "md":   "0.5rem",
+    "lg":   "0.75rem",
+    "xl":   "1rem",
+    "2xl":  "1.5rem",
+    "full": "9999px",
+    "_px": {
+      "sm":  "4px",
+      "md":  "8px",
+      "lg":  "12px",
+      "xl":  "16px",
+      "2xl": "24px"
+    },
+    "_semantic": {
+      "button":     "md",
+      "card":       "lg",
+      "input":      "md",
+      "badge":      "full",
+      "pill-nav":   "full",
+      "modal":      "xl",
+      "tooltip":    "sm",
+      "popover":    "lg",
+      "kbd":        "sm"
+    }
+  }
+}

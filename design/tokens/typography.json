@@ -1,0 +1,137 @@
+{
+  "_comment": "aibo Typography Tokens (Sprint 13)\nEditorial mixed-serif aesthetic: Inter (sans) + Source Serif 4 (serif).\nModular scale: 12/14/16/18/20/24/30/36/48px",
+
+  "font": {
+    "family": {
+      "sans":    "Inter, 'Noto Sans TC', system-ui, -apple-system, sans-serif",
+      "serif":   "'Source Serif 4', 'Noto Serif TC', Georgia, serif",
+      "mono":    "'JetBrains Mono', 'Fira Code', Menlo, monospace",
+      "display": "'Source Serif 4', 'Noto Serif TC', Georgia, serif"
+    },
+
+    "size": {
+      "xs":   "0.75rem",
+      "sm":   "0.875rem",
+      "base": "1rem",
+      "lg":   "1.125rem",
+      "xl":   "1.25rem",
+      "2xl":  "1.5rem",
+      "3xl":  "1.875rem",
+      "4xl":  "2.25rem",
+      "5xl":  "3rem",
+      "_px": {
+        "xs":   "12px",
+        "sm":   "14px",
+        "base": "16px",
+        "lg":   "18px",
+        "xl":   "20px",
+        "2xl":  "24px",
+        "3xl":  "30px",
+        "4xl":  "36px",
+        "5xl":  "48px"
+      }
+    },
+
+    "weight": {
+      "normal":   "400",
+      "medium":   "500",
+      "semibold": "600",
+      "bold":     "700"
+    },
+
+    "lineHeight": {
+      "none":     "1",
+      "tight":    "1.25",
+      "snug":     "1.375",
+      "normal":   "1.5",
+      "relaxed":  "1.625",
+      "loose":    "1.75"
+    },
+
+    "letterSpacing": {
+      "tighter": "-0.05em",
+      "tight":   "-0.025em",
+      "normal":  "0em",
+      "wide":    "0.025em",
+      "wider":   "0.05em",
+      "widest":  "0.1em"
+    },
+
+    "maxWidth": {
+      "prose": "65ch",
+      "wide":  "75ch"
+    }
+  },
+
+  "text": {
+    "_note": "Semantic text style presets",
+    "display-lg": {
+      "family":     "serif",
+      "size":       "4xl",
+      "weight":     "bold",
+      "lineHeight": "tight",
+      "tracking":   "tight"
+    },
+    "display-sm": {
+      "family":     "serif",
+      "size":       "3xl",
+      "weight":     "semibold",
+      "lineHeight": "tight"
+    },
+    "heading-lg": {
+      "family":     "sans",
+      "size":       "2xl",
+      "weight":     "semibold",
+      "lineHeight": "snug"
+    },
+    "heading-md": {
+      "family":     "sans",
+      "size":       "xl",
+      "weight":     "semibold",
+      "lineHeight": "snug"
+    },
+    "heading-sm": {
+      "family":     "sans",
+      "size":       "lg",
+      "weight":     "medium",
+      "lineHeight": "normal"
+    },
+    "body-lg": {
+      "family":     "sans",
+      "size":       "lg",
+      "weight":     "normal",
+      "lineHeight": "relaxed"
+    },
+    "body-md": {
+      "family":     "sans",
+      "size":       "base",
+      "weight":     "normal",
+      "lineHeight": "relaxed"
+    },
+    "body-sm": {
+      "family":     "sans",
+      "size":       "sm",
+      "weight":     "normal",
+      "lineHeight": "normal"
+    },
+    "caption": {
+      "family":     "sans",
+      "size":       "xs",
+      "weight":     "normal",
+      "lineHeight": "normal",
+      "color":      "fg.muted"
+    },
+    "label": {
+      "family":     "sans",
+      "size":       "sm",
+      "weight":     "medium",
+      "lineHeight": "normal"
+    },
+    "kbd": {
+      "family":     "mono",
+      "size":       "xs",
+      "weight":     "normal",
+      "lineHeight": "normal"
+    }
+  }
+}
