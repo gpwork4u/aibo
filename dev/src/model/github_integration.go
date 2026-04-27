@@ -35,4 +35,13 @@ const (
 
 	// ErrCodeGitHubNotConnected 尚未設定 GitHub 整合
 	ErrCodeGitHubNotConnected = "GITHUB_NOT_CONNECTED"
+
+	// ErrCodeGitHubRateLimited GitHub API rate limit 超限（429）
+	ErrCodeGitHubRateLimited = "GITHUB_RATE_LIMITED"
 )
+
+// RateLimitError GitHub rate limit 錯誤，含 retry_after_seconds
+type RateLimitError struct {
+	AppError
+	RetryAfterSeconds int `json:"retry_after_seconds"`
+}

@@ -12,7 +12,7 @@ import (
 )
 
 // Setup 設定路由
-func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler, calendarHandler *handler.CalendarHandler, journalHandler *handler.JournalHandler, journalDraftHandler *handler.JournalDraftHandler, journalAutoHandler *handler.JournalAutoHandler, projectHandler *handler.ProjectHandler, taskHandler *handler.TaskHandler, githubIntegrationHandler *handler.GitHubIntegrationHandler) *gin.Engine {
+func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler, calendarHandler *handler.CalendarHandler, journalHandler *handler.JournalHandler, journalDraftHandler *handler.JournalDraftHandler, journalAutoHandler *handler.JournalAutoHandler, projectHandler *handler.ProjectHandler, taskHandler *handler.TaskHandler, githubIntegrationHandler *handler.GitHubIntegrationHandler, githubCommitsHandler *handler.GitHubCommitsHandler) *gin.Engine {
 	r := gin.Default()
 
 	// CORS middleware — 允許跨網域（前端 localhost:3000 呼叫 API localhost:8080）
@@ -111,6 +111,9 @@ func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *
 			integrations.POST("/github/connect", githubIntegrationHandler.Connect)
 			integrations.GET("/github/status", githubIntegrationHandler.GetStatus)
 			integrations.DELETE("/github", githubIntegrationHandler.Disconnect)
+
+			// F-034b：取得指定日期區間的 GitHub commits（給 journal draft + 行事曆用）
+			integrations.GET("/github/commits", githubCommitsHandler.ListCommits)
 		}
 
 		// 匯入
