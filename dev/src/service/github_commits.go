@@ -185,23 +185,22 @@ func (s *GitHubCommitsService) fetchViaEvents(
 		}
 
 		// 追蹤最舊 event 時間，判斷是否超出 since 範圍
+		// 必須對所有 event 類型判斷（不只 PushEvent），否則夾在其他類型事件中的
+		// PushEvent 頁會被誤判成全部早於 since 而提早停止翻頁
 		allBeforeSince := true
 		for _, event := range events {
+			createdAt := event.GetCreatedAt().Time
+			if createdAt.After(sinceUTC) {
+				allBeforeSince = false
+			}
+
 			if event.GetType() != "PushEvent" {
 				continue
 			}
 
-			createdAt := event.GetCreatedAt().Time
-
 			// 記錄涉及的 repo（用於 fallback）
 			if event.Repo != nil {
 				repoSet[event.Repo.GetName()] = true
-			}
-
-			// 此 event 還在時間範圍內的判斷：event created_at 不用嚴格，
-			// 因為 event 是 push 時間，commit 時間在 payload 中
-			if createdAt.After(sinceUTC) {
-				allBeforeSince = false
 			}
 
 			// 提取 PushEvent payload 中的 commits
@@ -281,71 +280,85 @@ func (s *GitHubCommitsService) fetchViaRepos(
 		}
 		owner, repoName := parts[0], parts[1]
 
-		opts := &gogithub.CommitsListOptions{
-			Author: username,
-			Since:  sinceUTC,
-			ListOptions: gogithub.ListOptions{
-				PerPage: 100,
-			},
-		}
-		if !untilUTC.IsZero() {
-			opts.Until = untilUTC
-		}
-
-		repoCommits, resp, err := client.Repositories.ListCommits(ctx, owner, repoName, opts)
-		if err != nil {
-			slog.Warn("per-repo fallback 取得 commits 失敗",
-				"repo", repoFullName,
-				"error", mapGitHubError(err, resp),
-			)
-			continue
-		}
-
-		for _, rc := range repoCommits {
-			sha := rc.GetSHA()
-			if sha == "" {
-				continue
+		// 分頁取得所有 commits（避免只取第一頁造成遺漏）
+		for page := 1; ; page++ {
+			opts := &gogithub.CommitsListOptions{
+				Author: username,
+				Since:  sinceUTC,
+				ListOptions: gogithub.ListOptions{
+					Page:    page,
+					PerPage: 100,
+				},
+			}
+			if !untilUTC.IsZero() {
+				opts.Until = untilUTC
 			}
 
-			committedAt := time.Time{}
-			if rc.Commit != nil && rc.Commit.Author != nil && rc.Commit.Author.Date != nil {
-				committedAt = rc.Commit.Author.Date.Time
+			repoCommits, resp, err := client.Repositories.ListCommits(ctx, owner, repoName, opts)
+			if err != nil {
+				slog.Warn("per-repo fallback 取得 commits 失敗",
+					"repo", repoFullName,
+					"page", page,
+					"error", mapGitHubError(err, resp),
+				)
+				break
 			}
 
-			// 過濾時間範圍
-			if !committedAt.IsZero() {
-				if committedAt.Before(sinceUTC) || (!untilUTC.IsZero() && committedAt.After(untilUTC)) {
+				if len(repoCommits) == 0 {
+				break
+			}
+
+			for _, rc := range repoCommits {
+				sha := rc.GetSHA()
+				if sha == "" {
 					continue
 				}
+
+				committedAt := time.Time{}
+				if rc.Commit != nil && rc.Commit.Author != nil && rc.Commit.Author.Date != nil {
+					committedAt = rc.Commit.Author.Date.Time
+				}
+
+				// 過濾時間範圍
+				if !committedAt.IsZero() {
+					if committedAt.Before(sinceUTC) || (!untilUTC.IsZero() && committedAt.After(untilUTC)) {
+						continue
+					}
+				}
+
+				message := ""
+				if rc.Commit != nil {
+					message = rc.Commit.GetMessage()
+				}
+
+				var additions, deletions *int
+				if rc.Stats != nil {
+					a := rc.Stats.GetAdditions()
+					d := rc.Stats.GetDeletions()
+					additions = &a
+					deletions = &d
+				}
+
+				url := rc.GetHTMLURL()
+				if url == "" {
+					url = fmt.Sprintf("https://github.com/%s/commit/%s", repoFullName, sha)
+				}
+
+				commits = append(commits, GithubCommit{
+					SHA:         sha,
+					Repo:        repoFullName,
+					Message:     message,
+					URL:         url,
+					CommittedAt: committedAt,
+					Additions:   additions,
+					Deletions:   deletions,
+				})
 			}
 
-			message := ""
-			if rc.Commit != nil {
-				message = rc.Commit.GetMessage()
+			// 若此頁不足 100 筆，表示已無更多資料
+			if len(repoCommits) < 100 {
+				break
 			}
-
-			var additions, deletions *int
-			if rc.Stats != nil {
-				a := rc.Stats.GetAdditions()
-				d := rc.Stats.GetDeletions()
-				additions = &a
-				deletions = &d
-			}
-
-			url := rc.GetHTMLURL()
-			if url == "" {
-				url = fmt.Sprintf("https://github.com/%s/commit/%s", repoFullName, sha)
-			}
-
-			commits = append(commits, GithubCommit{
-				SHA:         sha,
-				Repo:        repoFullName,
-				Message:     message,
-				URL:         url,
-				CommittedAt: committedAt,
-				Additions:   additions,
-				Deletions:   deletions,
-			})
 		}
 	}
 
