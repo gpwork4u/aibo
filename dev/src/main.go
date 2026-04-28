@@ -162,8 +162,13 @@ func main() {
 	taskSvc := service.NewTaskService(taskRepo, projectRepo, entryRepo, journalRepo, projectSvc)
 	taskHandler := handler.NewTaskHandler(taskSvc, projectSvc)
 
+	// 初始化 Saved Views 服務（F-043）
+	viewRepo := repository.NewViewRepository(pool)
+	viewSvc := service.NewViewService(viewRepo)
+	viewHandler := handler.NewViewHandler(viewSvc)
+
 	// 設定路由
-	r := router.Setup(pool, apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, journalAutoHandler, projectHandler, taskHandler, githubIntegrationHandler, githubCommitsHandler)
+	r := router.Setup(pool, apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, journalAutoHandler, projectHandler, taskHandler, githubIntegrationHandler, githubCommitsHandler, viewHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
