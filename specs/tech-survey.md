@@ -1753,3 +1753,172 @@ F-041 Library Table、F-043 Saved Views 的 filter/sort URL 同步使用 **nuqs*
 - [GitHub: xyflow/xyflow Performance Discussion](https://github.com/xyflow/xyflow/discussions/4975)
 - [Building Complex Graph Diagrams with React Flow, ELK.js](https://dtoyoda10.medium.com/building-complex-graph-diagrams-with-react-flow-elk-js-and-dagre-js-8832f6a461c5)
 - [GitHub: kieler/elkjs](https://github.com/kieler/elkjs)
+
+---
+
+## Sprint 16 技術調查：Copilot 智慧層 + 快捷鍵
+
+### 調查日期
+2026-04-28
+
+---
+
+### 1. EventSource 客戶端重連策略（F-047）
+
+#### 原生 EventSource 行為
+瀏覽器原生 `EventSource` 已內建自動重連機制（預設 3 秒），符合 HTML Living Standard：
+- 連線中斷後自動重試，傳送 `Last-Event-ID` header，讓伺服器從斷點繼續推送
+- 若伺服器回傳 HTTP 204，瀏覽器停止重連
+- 若伺服器回傳 500，原生 `EventSource` **不會自動重試**（僅網路層中斷才重試）
+
+#### 決策：使用原生 EventSource + 手動錯誤重連
+| 方案 | 優點 | 缺點 | 選擇 |
+|------|------|------|------|
+| 原生 `EventSource` | 零依賴、瀏覽器原生 Last-Event-ID | 500 錯誤不重連 | **主要選擇** |
+| `reconnecting-eventsource` | 自動處理所有錯誤狀態下重連 | 額外 npm 依賴（5.7k stars） | 若重連需求複雜可引入 |
+| 自訂 fetch + ReadableStream | 完整控制、可 POST stream | 實作複雜度高 | 不使用（SSE 已足夠） |
+
+**最終決策**：使用原生 `EventSource`，在 `onerror` callback 中手動判斷是否重連（最多 3 次，指數退避）。Sprint 16 的 Copilot Panel 採 Panel 開啟即重建連線策略，不需持久重連。
+
+#### 關鍵實作要點
+```typescript
+// 連線生命週期綁定 Panel open/close
+useEffect(() => {
+  if (!isOpen) return;
+  const es = new EventSource('/api/v1/copilot/stream');
+  es.addEventListener('token', handleToken);
+  es.addEventListener('message_done', handleDone);
+  es.onerror = () => { es.close(); setIsStreaming(false); };
+  return () => es.close(); // cleanup on Panel close
+}, [isOpen]);
+```
+
+---
+
+### 2. Zustand Store 設計（F-047）
+
+#### 版本確認
+- zustand `^5`（2025 主流版本，Next.js 15 相容）
+- **注意**：`persist` middleware 在 Next.js App Router 中有 SSR hydration 風險
+
+#### 決策：不使用 persist，使用 shell layout 初始化
+| 方案 | 優點 | 缺點 | 選擇 |
+|------|------|------|------|
+| `persist` (localStorage) | 跨刷新保持訊息 | SSR hydration mismatch、序列化 EventSource ref | 不使用 |
+| 純記憶體 store（shell layout 掛載） | 零複雜度、無 hydration 問題 | 頁面刷新清空 | **採用** |
+| sessionStorage persist | 刷新保持、無跨分頁 | 仍有 hydration 問題 | 備選 |
+
+**理由**：Copilot 對話不需跨刷新保持（類比 Claude.ai 重整即新對話）。Store 初始化在 `app/(shell)/layout.tsx`，確保跨路由切換不重置。
+
+---
+
+### 3. cmdk 即時搜尋與 Action Groups（F-049）
+
+#### 現有基礎
+F-037（Sprint 13）已安裝 `cmdk`（shadcn/ui 採用的命令面板套件，底層為 Paco Coursey 的 `cmdk`）。
+
+#### Sprint 16 擴充方向
+| 功能 | 實作方式 | 注意事項 |
+|------|---------|---------|
+| 即時後端搜尋 | debounce 200ms + `GET /api/v1/entries?q=...` | 3+ 字元才觸發，silent fail |
+| Action Groups 分組 | `<Command.Group label="...">` | 每組最多 5 筆 |
+| `>` prefix AI mode | 監聽輸入值，切換 state | 隱藏其他分組 |
+| QuickCreateModal | Dialog 巢狀於 cmdk Dialog | 按 Enter 建立後關閉兩層 |
+
+**cmdk fuzzy search**：cmdk 內建 fuzzy filtering（依 `value` prop 比對），本地動作不需額外 library。後端搜尋結果以 `shouldFilter={false}` 自行控制排序。
+
+**debounce**：使用 `use-debounce` npm 套件（`useDebounceValue`），或自訂 `setTimeout` hook，避免每字元觸發 API。
+
+---
+
+### 4. 鍵盤快捷鍵架構（F-050）
+
+#### 候選方案比較
+| 套件 | Stars | Sequential Keys | Scope 控制 | Bundle |
+|------|-------|----------------|------------|--------|
+| `react-hotkeys-hook` | 11k | 支援（`g>i` 語法） | scope / enableOnFormTags | ~8 KB |
+| TanStack Hotkeys | 官方 | `useHotkeySequence` | context-based | 較新，較小 |
+| 自訂 `useKeyboardShortcuts` | - | 手動實作 lastKey + timeout | 自行控制 | 零依賴 |
+
+**決策：自訂 `useKeyboardShortcuts` hook**
+
+理由：
+1. G 系列 sequential key（500ms timeout）spec 已定義清楚，手動實作最直接
+2. scope（global / inbox / library / entry）以 React context 管理，不需外部 library 的 scope 機制
+3. Input focus 偵測（`document.activeElement.tagName === 'INPUT'`）自行控制更精準
+4. 零額外依賴（`react-hotkeys-hook` 的功能對此 feature 過大）
+
+若後續快捷鍵數量超過 50 個，可遷移至 `react-hotkeys-hook`。
+
+#### Sequential Key 實作要點
+```typescript
+// lastKey + timestamp 追蹤 G 系列
+const lastKeyRef = useRef<{ key: string; time: number } | null>(null);
+
+const handleKeyDown = (e: KeyboardEvent) => {
+  if (isInputFocused()) return; // 不在 input 內才觸發字母快捷鍵
+  const now = Date.now();
+  if (lastKeyRef.current?.key === 'g' && now - lastKeyRef.current.time < 500) {
+    triggerGAction(e.key); // G+I, G+L, G+T, G+C, G+S
+    lastKeyRef.current = null;
+  } else {
+    if (e.key === 'g') lastKeyRef.current = { key: 'g', time: now };
+    else triggerSingleAction(e.key, e.metaKey);
+  }
+};
+```
+
+---
+
+### 5. Sprint 16 依賴套件清單
+
+| 套件 | 版本 | 用途 | Feature | 備注 |
+|------|------|------|---------|------|
+| `zustand` | ^5 | Copilot store | F-047 | 已安裝 |
+| `cmdk` | ^1 | Command Palette | F-049 | 已安裝（F-037） |
+| `use-debounce` | ^10 | 搜尋 debounce | F-049 | 新增 |
+
+**不需新增**：`reconnecting-eventsource`（原生 EventSource 已足夠）、`react-hotkeys-hook`（自訂 hook）
+
+---
+
+### 6. 後端 SSE Streaming 架構（F-048）
+
+#### Go Gin SSE 實作要點
+```go
+// 必要 headers
+c.Header("Content-Type", "text/event-stream")
+c.Header("Cache-Control", "no-cache")
+c.Header("Connection", "keep-alive")
+c.Header("X-Accel-Buffering", "no") // 避免 Nginx buffering
+
+// Flush 確保即時推送
+c.Stream(func(w io.Writer) bool {
+  if token, ok := <-tokenCh; ok {
+    c.SSEvent("token", gin.H{"token": token, "msg_id": msgID})
+    return true
+  }
+  return false
+})
+```
+
+#### LLM Streaming 整合
+- 使用 F-017 的 `LlmService` 連線池，呼叫 `StreamChat` 方法
+- Context 注入：語意搜尋 top-5 entries → system prompt
+- Session history：最近 10 輪（20 messages），超過截斷最舊
+- Timeout：90 秒無 token → 推送 `event:error { code: "STREAM_TIMEOUT" }` → 關閉連線
+
+---
+
+### 7. 參考資料
+
+- [MDN: Using server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)
+- [GitHub: fanout/reconnecting-eventsource](https://github.com/fanout/reconnecting-eventsource)
+- [Zustand persist middleware](https://zustand.docs.pmnd.rs/reference/middlewares/persist)
+- [How to use Zustand persist in Next.js](https://dev.to/abdulsamad/how-to-use-zustands-persist-middleware-in-nextjs-4lb5)
+- [shadcn/ui Command component](https://ui.shadcn.com/docs/components/radix/command)
+- [GitHub: shadcnstudio/shadcn-cmdk-search](https://github.com/shadcnstudio/shadcn-cmdk-search)
+- [React Hotkeys Hook](https://react-hotkeys-hook.vercel.app/)
+- [TanStack Hotkeys Quick Start](https://tanstack.com/hotkeys/latest/docs/framework/react/quick-start)
+- [Streaming SSE with Go + Gin](https://pascalallen.medium.com/streaming-server-sent-events-with-go-8cc1f615d561)
+- [SSE for LLM Streaming 2025](https://procedure.tech/blogs/the-streaming-backbone-of-llms-why-server-sent-events-(sse)-still-wins-in-2025)
