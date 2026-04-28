@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useQueryState, parseAsString, parseAsInteger } from "nuqs";
-import { listEntries, archiveEntry, deleteEntry, type EntryListItem } from "@/lib/api/entries";
+import { listEntries, batchEntries, deleteEntry, type EntryListItem } from "@/lib/api/entries";
 import { LibraryTable } from "@/components/library/library-table";
 import { LibraryToolbar } from "@/components/library/library-toolbar";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -164,7 +164,7 @@ export default function LibraryPage() {
   const total = data?.pagination?.total ?? 0;
 
   const archiveMut = useMutation({
-    mutationFn: archiveEntry,
+    mutationFn: (id: string) => batchEntries({ ids: [id], action: "archive" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["entries", "library"] }),
   });
   const deleteMut = useMutation({
