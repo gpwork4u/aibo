@@ -12,7 +12,7 @@ import (
 )
 
 // Setup 設定路由
-func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler, calendarHandler *handler.CalendarHandler, journalHandler *handler.JournalHandler, journalDraftHandler *handler.JournalDraftHandler, journalAutoHandler *handler.JournalAutoHandler, projectHandler *handler.ProjectHandler, taskHandler *handler.TaskHandler, githubIntegrationHandler *handler.GitHubIntegrationHandler, githubCommitsHandler *handler.GitHubCommitsHandler) *gin.Engine {
+func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler, calendarHandler *handler.CalendarHandler, journalHandler *handler.JournalHandler, journalDraftHandler *handler.JournalDraftHandler, journalAutoHandler *handler.JournalAutoHandler, projectHandler *handler.ProjectHandler, taskHandler *handler.TaskHandler, githubIntegrationHandler *handler.GitHubIntegrationHandler, githubCommitsHandler *handler.GitHubCommitsHandler, viewHandler *handler.ViewHandler) *gin.Engine {
 	r := gin.Default()
 
 	// CORS middleware — 允許跨網域（前端 localhost:3000 呼叫 API localhost:8080）
@@ -185,6 +185,17 @@ func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *
 			tasks.PATCH("/:id", taskHandler.Update)
 			tasks.POST("/:id/complete", taskHandler.Complete)
 			tasks.DELETE("/:id", taskHandler.Delete)
+		}
+
+		// Saved Views（F-043）
+		// 注意：/reorder 必須在 /:id 之前以避免誤匹配
+		views := v1.Group("/views")
+		{
+			views.GET("", viewHandler.List)
+			views.POST("", viewHandler.Create)
+			views.PATCH("/reorder", viewHandler.Reorder)
+			views.PATCH("/:id", viewHandler.Update)
+			views.DELETE("/:id", viewHandler.Delete)
 		}
 	}
 
