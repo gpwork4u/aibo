@@ -1009,3 +1009,117 @@ F-048 → F-047（完整 streaming 測試需要 F-048）
 | SSE 連線在代理（Nginx）後被 buffered | 前端無法即時收到 token | 後端設定 `X-Accel-Buffering: no` header |
 | zustand state 跨路由 hydration 問題 | Panel 狀態重置 | store 初始化在 shell layout，非 page component |
 | CmdK batch classify 大量 inbox items | 請求超時 | 後端非同步處理，前端 progress polling |
+
+---
+
+## Sprint 14 依賴圖譜（Inbox + Library + Today）
+
+### 功能總覽
+
+| 編號 | 名稱 | 優先級 | 後端需求 |
+|------|------|--------|---------|
+| F-040 | Inbox Triage View | P0 | 新增 `POST /api/v1/entries/batch` endpoint |
+| F-041 | Library Table View | P0 | 沿用既有 API，無新後端 |
+| F-042 | Today Dashboard | P0 | 沿用既有 API，無新後端 |
+| F-043 | Saved Views + Filter Bar | P1 | 新增 `saved_views` table + CRUD API（migration 018） |
+
+### Sprint 13 已完成依賴（可直接使用）
+
+- Design tokens（editorial paper theme）
+- shadcn/ui primitives
+- App Shell + parallel routes `/dashboard` hub
+- Command Palette skeleton（⌘K）
+- Cookie session auth + SSE skeleton
+
+### 依賴關係
+
+```
+Sprint 13 成果（design tokens + shadcn + shell layout + cookie auth）
+│
+├── F-040 Inbox Triage View
+│   ├── 沿用：GET /api/v1/entries?status=inbox（F-001/F-002 已實作）
+│   ├── 沿用：PATCH /api/v1/entries/:id（狀態更新）
+│   ├── 沿用：DELETE /api/v1/entries/:id（軟刪除）
+│   └── 新增：POST /api/v1/entries/batch（批次操作）
+│
+├── F-041 Library Table View
+│   ├── 沿用：GET /api/v1/entries（含 q / status / category_id / tags / sort params）
+│   └── 依賴：nuqs（URL state sync）
+│
+├── F-042 Today Dashboard
+│   ├── 沿用：GET /api/v1/journal/:date
+│   ├── 沿用：GET /api/v1/calendar/days/:date
+│   ├── 沿用：GET /api/v1/tasks?due_date=today&status=pending
+│   └── 沿用：GET /api/v1/entries?updated_since=today_start&per_page=5
+│
+└── F-043 Saved Views + Filter Bar
+    ├── 新建：migration 018 `saved_views` table
+    ├── 新增：GET / POST / PATCH / DELETE /api/v1/views
+    ├── 新增：PATCH /api/v1/views/reorder
+    └── UI 整合：sidebar 連結至 F-041 Library filter 狀態
+
+UI Design（Inbox 卡片、Library table chrome、Today sections、SavedViews chip）
+├── F-040 依賴（InboxCard 樣式）
+├── F-041 依賴（LibraryTable column header chrome）
+├── F-042 依賴（Today section cards）
+└── F-043 依賴（SavedViews chip 元件）
+
+QA 與 Wave 0 同步開始撰寫 e2e test scripts
+```
+
+### 依賴說明
+
+**Data Model 依賴**
+- F-043 需先完成 migration 018（`saved_views` table），其他 feature 無新 migration
+- F-040、F-041、F-042 全部沿用既有 DB schema
+
+**API 依賴**
+- F-040 的批次操作 endpoint 為新增後端，但前端 UI 可先 mock 開發，不阻塞
+- F-043 後端 API 新增，前端 UI 依賴後端，但可先以 localStorage mock
+
+**UI 依賴**
+- 所有 4 個 features 均依賴 UI Design 提供的元件規格（InboxCard、TableChrome、TodaySectionCard、SavedViewChip）
+- UI Design 需先完成才能實作最終樣式，但不阻塞功能骨架開發
+
+### 拓撲排序
+
+#### Wave 0（立即並行啟動）
+- **UI Design**：Inbox 卡片、Library table chrome、Today sections、SavedViews chip
+- **F-040 Inbox Triage View**（後端 batch endpoint 可先 mock）
+- **F-042 Today Dashboard**（全部沿用既有 API，無依賴）
+- **QA**：開始撰寫 F-040~F-043 e2e test scripts
+
+#### Wave 1（F-043 後端 migration 完成後）
+- **F-041 Library Table View**（依賴 nuqs，不依賴後端 migration）
+- **F-043 Saved Views**（依賴 migration 018）
+
+> 實務上 F-041 不依賴 F-043 的 migration，可與 Wave 0 同步啟動。
+> F-043 的後端（migration 018）最早可完成，前端整合為 Wave 1。
+
+### 並行甘特圖
+
+```
+Week 1:
+UI Design:  [Inbox卡片 + Table chrome + Today sections + SavedViews chip ─────]
+F-040:      [批次 endpoint + Inbox UI + 鍵盤快捷鍵 ──────────────────────────]
+F-042:      [Today 聚合視圖 + 各 section 獨立 loading ───────────────────────]
+QA:         [撰寫 F-040~F-043 e2e scenarios ────────────────────────────────]
+
+Week 2:
+F-041:      [TanStack Table + Virtual + nuqs URL sync ────────────────────────]
+F-043:      [migration 018 + saved_views CRUD + sidebar chip ────────────────]
+Code Review:[逐 PR 審查 ─────────────────────────────────────────────────────]
+```
+
+### 關鍵路徑
+
+migration 018（F-043 後端）→ F-043 前端整合
+
+### 風險項目
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| TanStack Virtual 與 shadcn Table 樣式衝突 | Layout 破版 | 使用 `div` 替代 `table` element，或 spacer-based virtualization |
+| nuqs 與 Next.js App Router RSC 水合不一致 | URL state 閃爍 | 使用 `NuqsAdapter` 包裹 layout，`shallow: true` 避免 server re-render |
+| Today Dashboard 4 個 API 同時請求 | 頁面載入慢 | TanStack Query `Promise.all` 平行請求 + Suspense boundary per section |
+| 批次操作 partial success UX 混亂 | 使用者不知道哪些失敗 | toast 明確列出 failed ids 數量 |

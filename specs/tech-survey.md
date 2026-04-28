@@ -1559,3 +1559,98 @@ dev/frontend/
 - [Google Calendar Events: list](https://developers.google.com/workspace/calendar/api/v3/reference/events/list)
 - [Avoid Calendar API limits](https://support.google.com/a/answer/2905486)
 - [date-fns-tz](https://github.com/marnusw/date-fns-tz)
+
+---
+
+## Sprint 14 技術調查（2026-04-28）
+
+### 調查主題：TanStack Table v8、TanStack Virtual v3、URL State Sync
+
+---
+
+### 1. TanStack Table v8
+
+#### 核心架構
+TanStack Table v8 為 headless 表格引擎，不包含任何 markup 或樣式，完全由消費方控制渲染。版本 v8 相較 v7（react-table）為完整重寫，API 以 `createColumnHelper` 為核心，以 row model pipeline 處理 filter / sort / group / expand 等狀態。
+
+#### 與虛擬化的整合
+- 虛擬化需搭配 `@tanstack/react-virtual`；**不可同時啟用 pagination**（`getPaginatedRowModel`），因虛擬化需要全部 row 在 DOM 外可見
+- 消費 `table.getRowModel().rows` 取得所有已套用 filter/sort/group 後的最終 rows，再交給 Virtualizer
+- spacer row 技術（padding top / bottom div）保留原生 `<table>` 語意結構
+
+#### 效能重點
+- v8 近期 PR（#5927）將重複 row instance methods 移至 prototype，大幅降低大量資料集的記憶體佔用
+- 50,000+ rows 下仍可維持 60 FPS（搭配 TanStack Virtual）
+
+#### 決策
+使用 **TanStack Table v8**（`@tanstack/react-table`）作為 Library Table（F-041）的核心。
+
+---
+
+### 2. TanStack Virtual v3
+
+#### 概述
+`@tanstack/react-virtual` v3 為 headless 虛擬化 hook，最新版本 **3.13.24**（2025-04 更新，活躍維護中）。
+
+#### 關鍵 API
+| API | 用途 |
+|-----|------|
+| `useVirtualizer` | row / column 虛擬化 hook |
+| `getTotalSize()` | 回傳完整列表高度，供 spacer div 使用 |
+| `getVirtualItems()` | 當前可視範圍的 item 描述陣列 |
+| `useFlushSync` option | 同步渲染（精確捲動，影響效能需測試） |
+
+#### 套件規格
+- bundle 大小：約 10–15 KB（tree-shaking 後更小）
+- 支援：vertical / horizontal / grid 虛擬化、sticky items、variable size
+- 框架支援：React、Vue、Solid、Svelte、Lit、Angular
+
+#### 決策
+F-040 Inbox（虛擬化列表）、F-041 Library Table（虛擬化 rows）均使用 **`@tanstack/react-virtual` v3**。
+
+---
+
+### 3. URL State Sync
+
+#### 問題：原生 `useSearchParams` 的缺陷
+- 需手動 string 轉換（parse / stringify / encode）
+- 無型別安全
+- `router.push` / `router.replace` 更新後不立即反映（非 useState 語意）
+- 需要大量 `useEffect` 同步
+
+#### 方案比較
+
+| 方案 | 型別安全 | Next.js App Router 支援 | bundle 大小 | 維護狀態 |
+|------|---------|------------------------|------------|---------|
+| 原生 `useSearchParams` | 無 | 是 | 0 KB | Next.js 內建 |
+| **nuqs** | 是（parser 系統） | 是（NuqsAdapter） | ~8 KB | 活躍（47ng/nuqs） |
+| next-usequerystate | 已合併入 nuqs | — | — | 停止維護 |
+
+#### nuqs 關鍵特性
+- `useQueryState` / `useQueryStates`：類 `useState` 介面，自動同步 URL
+- 內建 parser：`parseAsInteger`、`parseAsString`、`parseAsArrayOf` 等
+- 支援 `shallow: true`（不觸發 server re-render）
+- throttle / debounce 內建（避免高頻率搜尋輸入寫 URL 的效能問題）
+- 與 Zustand / Jotai 互補：URL state 管理 filter/sort 參數，UI state（hover、modal open）留在 store
+
+#### 決策
+F-041 Library Table、F-043 Saved Views 的 filter/sort URL 同步使用 **nuqs**（`nuqs` package）。
+
+---
+
+### 4. Sprint 14 依賴套件清單
+
+| 套件 | 版本 | 用途 | Feature |
+|------|------|------|---------|
+| `@tanstack/react-table` | ^8 | 表格核心 | F-041 |
+| `@tanstack/react-virtual` | ^3 | 虛擬化滾動 | F-040, F-041 |
+| `nuqs` | ^2 | URL search params state | F-041, F-043 |
+
+### 5. 參考資料
+
+- [TanStack Table v8 Virtualization Guide](https://tanstack.com/table/v8/docs/guide/virtualization)
+- [TanStack Virtual v3 React Docs](https://tanstack.com/virtual/v3/docs/framework/react/react-virtual)
+- [Building an Efficient Virtualized Table with TanStack Virtual and React Query with ShadCN](https://dev.to/ainayeem/building-an-efficient-virtualized-table-with-tanstack-virtual-and-react-query-with-shadcn-2hhl)
+- [nuqs — Type-safe search params state management for React](https://nuqs.dev/)
+- [Managing search parameters in Next.js with nuqs — LogRocket](https://blog.logrocket.com/managing-search-parameters-next-js-nuqs/)
+- [Stop Fighting Next.js Search Params: Use nuqs](https://dev.to/tphilus/stop-fighting-nextjs-search-params-use-nuqs-for-type-safe-url-state-2a0h)
