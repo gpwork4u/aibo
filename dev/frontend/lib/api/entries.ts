@@ -68,6 +68,20 @@ export interface ListEntriesParams {
   category_id?: string;
   is_archived?: boolean;
   tags?: string[];
+  /** F-040: filter by entry status (inbox / library / archived) */
+  status?: string;
+}
+
+export type BatchAction = "archive" | "move_to_library" | "delete" | "classify";
+
+export interface BatchEntriesRequest {
+  ids: string[];
+  action: BatchAction;
+}
+
+export interface BatchEntriesResponse {
+  succeeded: string[];
+  failed: Array<{ id: string; error: string }>;
 }
 
 export interface CreateEntryInput {
@@ -111,6 +125,7 @@ function buildQuery(params: ListEntriesParams): string {
   if (params.category_id !== undefined) sp.set("category_id", params.category_id);
   if (params.is_archived !== undefined) sp.set("is_archived", String(params.is_archived));
   if (params.tags && params.tags.length > 0) sp.set("tags", params.tags.join(","));
+  if (params.status) sp.set("status", params.status);
   const q = sp.toString();
   return q ? `?${q}` : "";
 }
@@ -135,4 +150,16 @@ export async function updateEntry(id: string, input: UpdateEntryInput): Promise<
 
 export async function deleteEntry(id: string): Promise<void> {
   await apiClient.delete(`/api/v1/entries/${id}`);
+}
+
+/** F-040: 批次操作 entries */
+export async function batchEntries(
+  req: BatchEntriesRequest,
+): Promise<BatchEntriesResponse> {
+  return apiClient.post<BatchEntriesResponse>("/api/v1/entries/batch", req);
+}
+
+/** F-040: 觸發單筆 LLM 分類 */
+export async function classifyEntry(id: string): Promise<void> {
+  await apiClient.post(`/api/v1/entries/${id}/classify`, {});
 }
