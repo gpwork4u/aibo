@@ -1123,3 +1123,89 @@ migration 018（F-043 後端）→ F-043 前端整合
 | nuqs 與 Next.js App Router RSC 水合不一致 | URL state 閃爍 | 使用 `NuqsAdapter` 包裹 layout，`shallow: true` 避免 server re-render |
 | Today Dashboard 4 個 API 同時請求 | 頁面載入慢 | TanStack Query `Promise.all` 平行請求 + Suspense boundary per section |
 | 批次操作 partial success UX 混亂 | 使用者不知道哪些失敗 | toast 明確列出 failed ids 數量 |
+
+---
+
+# Sprint 15 依賴圖譜
+
+## 功能總覽
+
+| 編號 | 名稱 | 優先級 | 依賴 |
+|------|------|--------|------|
+| F-044 | Entry Links Backend | P0 | 無（migration 019） |
+| F-045 | Canvas Graph View | P1 | F-044（graph endpoint + links）、UI Design（EntryNode 樣式） |
+| F-046 | Relation Editor | P1 | F-044（links API）、UI Design（RelationChip 元件） |
+
+## 依賴關係圖
+
+```
+F-044 Entry Links Backend（migration 019 + CRUD API）
+├── F-045 Canvas Graph View（GET /api/v1/graph + links data）
+└── F-046 Relation Editor（POST/PATCH/DELETE /api/v1/entries/:id/links）
+
+UI Design（EntryNode、LinkEdge、RelationChip、NodeDetailSheet）
+├── F-045（Canvas 節點與邊視覺規格）
+└── F-046（RelationChip badge 顏色、link_type 色彩對應）
+```
+
+## 依賴說明
+
+**Data Model 依賴**
+- F-044 引入 migration 019（`entry_links` table、`link_type_enum`、`link_source_enum`）
+- F-045 的 `GET /api/v1/graph` endpoint 直接查詢 `entry_links` table，**必須在 F-044 migration 完成後**
+- F-046 直接呼叫 F-044 定義的所有 links CRUD endpoints
+
+**API 依賴**
+- F-045 依賴 F-044 提供：`GET /api/v1/entries/:id/links`、新增的 `GET /api/v1/graph` endpoint
+- F-046 依賴 F-044 提供：`GET /api/v1/entries/:id/links`、`POST`、`PATCH`、`DELETE` endpoints
+- F-046 另沿用既有：`GET /api/v1/entries?q=keyword`（Combobox 搜尋）
+
+**UI 依賴**
+- F-045 需要 UI Design 提供：`EntryNode` 樣式規格、`LinkEdge` 顏色與標籤樣式、`NodeDetailSheet` 版面
+- F-046 需要 UI Design 提供：`RelationChip` badge 顏色對應（link_type color map）、`AddRelationForm` 版面規格
+
+**平行開發可行性**
+- F-044 後端無 UI，可立即啟動，不依賴 UI Design
+- F-045、F-046 前端骨架可先以 mock data 開發，待 F-044 完成後整合
+- UI Design 可與 F-044 後端並行開始設計元件規格
+
+## 拓撲排序
+
+### Wave 0（立即並行啟動）
+- **F-044 Entry Links Backend**：migration 019 + CRUD API（無 UI 依賴，P0 先行）
+- **UI Design**：EntryNode、LinkEdge、RelationChip、NodeDetailSheet 樣式規格
+- **QA**：開始撰寫 F-044~F-046 e2e test scripts（不需等後端完成）
+
+### Wave 1（F-044 後端 + UI Design 完成後）
+- **F-045 Canvas Graph View**：`GET /api/v1/graph` endpoint + React Flow + ELK layout
+- **F-046 Relation Editor**：RelationChip + AddRelationForm + links CRUD 整合
+
+> F-044 後端預計 Wave 0 最快完成（純後端，無 UI）；F-045、F-046 可在 F-044 PR merge 後立即開始整合。
+> ELK bundle 使用 dynamic import，不影響 F-045 骨架開發的起始時機。
+
+### 並行甘特圖
+
+```
+Wave 0:
+F-044:     [migration 019 + link CRUD API + 雙向查詢 ──────────────────────]
+UI Design: [EntryNode + LinkEdge + RelationChip + NodeDetailSheet ──────────]
+QA:        [撰寫 F-044~F-046 e2e scenarios ───────────────────────────────]
+
+Wave 1（F-044 + UI Design 完成後）:
+F-045:     [GET /graph endpoint + React Flow + ELK layout + ego network ────]
+F-046:     [RelationEditor UI + Combobox + chip CRUD 整合 ─────────────────]
+Code Review:[逐 PR 審查 ────────────────────────────────────────────────────]
+```
+
+### 關鍵路徑
+
+F-044 migration 019 → F-045 `GET /api/v1/graph` → F-045 前端整合
+
+### 風險項目
+
+| 風險 | 影響 | 緩解 |
+|------|------|------|
+| ELK bundle 1.5 MB 影響首屏載入 | Canvas 頁首屏慢 | `next/dynamic` + dynamic `import('elkjs')` 延遲載入 |
+| ELK 計算凍結 UI（200 節點） | 操作無反應 | `new ELK({ workerFactory })` 在 Web Worker 執行 layout |
+| `node.measured` 未就緒時 layout 錯誤 | 節點重疊 | `onNodesChange` 後確認 `node.measured` 有值再觸發 ELK |
+| entry_links CASCADE 刪除效能 | 大量 entries 刪除時慢 | DB index on `from_id`、`to_id` 已定義於 migration 019 |
