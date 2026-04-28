@@ -1654,3 +1654,102 @@ F-041 Library Table、F-043 Saved Views 的 filter/sort URL 同步使用 **nuqs*
 - [nuqs — Type-safe search params state management for React](https://nuqs.dev/)
 - [Managing search parameters in Next.js with nuqs — LogRocket](https://blog.logrocket.com/managing-search-parameters-next-js-nuqs/)
 - [Stop Fighting Next.js Search Params: Use nuqs](https://dev.to/tphilus/stop-fighting-nextjs-search-params-use-nuqs-for-type-safe-url-state-2a0h)
+
+---
+
+## Sprint 15 技術調查（2026-04-28）
+
+### 調查主題：React Flow v12、ELK Layout、知識圖譜效能優化
+
+---
+
+### 1. React Flow（@xyflow/react）v12
+
+#### 版本現況
+- 最新穩定版：**12.8.4**（2025-08 更新，持續活躍維護）
+- 最近重要版本：12.6.0（2025-04）、12.7.1（2025-06）
+- npm package 已更名：`reactflow` → `@xyflow/react`（v12 起）
+- import 調整：`import { ReactFlow } from '@xyflow/react'`，樣式：`'@xyflow/react/dist/style.css'`
+
+#### v12 重大新特性
+| 特性 | 說明 |
+|------|------|
+| SSR 支援 | 可在 node.measured 前定義 width/height，支援 server-side render + client hydrate |
+| `node.measured` | 佈局計算必須改用 `node.measured.width/height`（取代舊版 `node.width/height`） |
+| Provider 初始化 | `ReactFlowProvider` 新增 `initialMinZoom`、`initialMaxZoom`、`initialFitViewOptions` |
+| 效能提升 | 近期版本內建效能優化（memoized node rendering） |
+
+#### 效能優化策略（大圖適用）
+1. **節點 memoization**：所有自定義節點 Component 必須用 `React.memo` 包裹，避免每次 viewport 移動觸發重渲染
+2. **`useCallback` / `useMemo`**：傳入 ReactFlow 的 handlers 和 nodeTypes 定義必須穩定參考
+3. **隱藏節點**：超過 200 節點時，用 `hidden: true` 動態摺疊離屏節點（非 DOM remove，保留 state）
+4. **簡化樣式**：超過 100 節點時，移除 CSS animation、box-shadow、複雜 gradient
+5. **dot-only 降級**：超過 200 節點啟動 dot-only 模式（無 label 自定義節點），降低 DOM 元素數量
+
+#### 決策
+使用 **`@xyflow/react` v12**（最新 12.8.4），自定義 `EntryNode` 和 `LinkEdge` 元件。
+
+---
+
+### 2. 佈局算法比較：ELK vs Dagre vs D3-Force
+
+| 算法 | bundle 大小 | 異步 | 適用圖形 | 配置難度 | edge routing | 適合本專案 |
+|------|-----------|------|---------|---------|-------------|-----------|
+| **Dagre** | ~40 KB | 否（同步） | DAG / tree | 簡單 | 否 | 部分（tree 視圖） |
+| **ELK.js** | ~1.5 MB | 是（async） | 任意複雜圖 | 高 | 是 | 最適合（知識圖譜） |
+| **D3-Force** | ~60 KB | 是（迭代） | 非層次關係網路 | 中 | 否 | 適合（力導向探索） |
+| **D3-Hierarchy** | ~20 KB | 否 | 單一 root tree | 低 | 否 | 不適合（非 tree） |
+
+#### ELK.js 特性詳解
+- **套件**：`elkjs`（Eclipse Layout Kernel JS port）
+- 支援多種演算法：`layered`（hierarchical）、`force`、`stress`、`mrtree`、`radial`
+- **非同步計算**：`elk.layout(graph)` 回傳 Promise，React Flow 需用 `useCallback` + `useEffect` 處理
+- **v12 整合要點**：佈局完成後，節點位置從 `node.measured` 讀取，不再從 `node` 直接讀
+- **Web Worker 可行性**：ELK 計算可在 Web Worker 執行（`new ELK({ workerFactory })` 支援 worker），避免大圖 layout 凍結 UI
+- **bundle 大小問題**：1.5 MB 較大，建議 dynamic import（`import('elkjs/lib/elk.bundled.js')`）搭配 `next/dynamic` 延遲載入
+
+#### 決策
+- **預設佈局**：ELK `layered`（hierarchical，適合有向知識圖譜）
+- **力導向佈局**：ELK `force` 或 D3-Force（探索模式切換用）
+- **ELK Web Worker**：啟用，避免 200 節點以上的 layout 計算凍結 UI
+- **dynamic import**：ELK 使用 `import('elkjs')` 延遲載入，不影響初始 bundle
+
+---
+
+### 3. 知識圖譜效能策略
+
+#### 節點數分級
+| 節點數 | 模式 | 說明 |
+|--------|------|------|
+| ≤ 50 | 完整模式 | 顯示 title、category badge、confidence、完整樣式 |
+| 51–200 | 精簡模式 | 顯示 title only，移除 badge 和 confidence，簡化邊樣式 |
+| > 200 | dot-only 模式 | 僅圓點 + hover tooltip，無 label，後端截斷並回傳 `meta.truncated: true` |
+
+#### Ego Network 策略
+- 預設 depth=2，最大 depth=3（後端強制限制）
+- 前端雙擊節點觸發：`GET /api/v1/graph?entry_id={id}&depth=2`
+- ELK layout 以雙擊節點為 root，重新計算 hierarchical layout
+
+#### 邊渲染優化
+- 使用 React Flow 內建 `BezierEdge` 作為 `LinkEdge` 基底（效能優於自定義 SVG path）
+- link_type 標籤（label）使用 `EdgeLabelRenderer` portal，避免 SVG foreignObject 效能問題
+
+---
+
+### 4. Sprint 15 依賴套件清單
+
+| 套件 | 版本 | 用途 | Feature |
+|------|------|------|---------|
+| `@xyflow/react` | ^12 | 知識圖譜渲染 | F-045 |
+| `elkjs` | ^0.9 | 圖形佈局算法 | F-045 |
+
+### 5. 參考資料
+
+- [React Flow 12 Release Blog](https://xyflow.com/blog/react-flow-12-release)
+- [React Flow Layouting Overview](https://reactflow.dev/learn/layouting/layouting)
+- [React Flow ELK.js Example](https://reactflow.dev/examples/layout/elkjs)
+- [React Flow Performance Guide](https://reactflow.dev/learn/advanced-use/performance)
+- [React Flow 12.6.0 What's New](https://reactflow.dev/whats-new/2025-04-17)
+- [GitHub: xyflow/xyflow Performance Discussion](https://github.com/xyflow/xyflow/discussions/4975)
+- [Building Complex Graph Diagrams with React Flow, ELK.js](https://dtoyoda10.medium.com/building-complex-graph-diagrams-with-react-flow-elk-js-and-dagre-js-8832f6a461c5)
+- [GitHub: kieler/elkjs](https://github.com/kieler/elkjs)
