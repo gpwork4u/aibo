@@ -7,6 +7,8 @@ import { MainArea } from "@/components/shell/main-area";
 import { CopilotSlot } from "@/components/shell/copilot-slot";
 import { CmdkProvider } from "@/components/cmdk/cmdk-provider";
 import { CommandPalette } from "@/components/cmdk/command-palette";
+import { ShortcutsModal } from "@/components/shortcuts/shortcuts-modal";
+import { useKeyboardShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { useApiKey } from "@/lib/hooks/use-api-key";
@@ -17,6 +19,18 @@ interface InboxCountResponse {
   count?: number;
   total?: number;
   pagination?: { total?: number };
+}
+
+function ShellContent({ children }: { children: React.ReactNode }) {
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  useKeyboardShortcuts({ onOpenShortcutsModal: () => setShortcutsOpen(true) });
+
+  return (
+    <>
+      {children}
+      <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+    </>
+  );
 }
 
 export default function ShellLayout({
@@ -65,7 +79,9 @@ export default function ShellLayout({
         {/* 中間區域：TopBar + 內容 */}
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar />
-          <MainArea>{children}</MainArea>
+          <MainArea>
+            <ShellContent>{children}</ShellContent>
+          </MainArea>
         </div>
 
         {/* 右側 Copilot 佔位 */}
