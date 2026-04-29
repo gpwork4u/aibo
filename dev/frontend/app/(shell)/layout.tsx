@@ -4,11 +4,12 @@ import { useState } from "react";
 import { Sidebar } from "@/components/shell/sidebar";
 import { TopBar } from "@/components/shell/top-bar";
 import { MainArea } from "@/components/shell/main-area";
-import { CopilotSlot } from "@/components/shell/copilot-slot";
+import { CopilotPanel } from "@/components/copilot/copilot-panel";
 import { CmdkProvider } from "@/components/cmdk/cmdk-provider";
 import { CommandPalette } from "@/components/cmdk/command-palette";
 import { ShortcutsModal } from "@/components/shortcuts/shortcuts-modal";
 import { useKeyboardShortcuts } from "@/lib/hooks/use-keyboard-shortcuts";
+import { useCopilotStore } from "@/lib/stores/copilot-store";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { useApiKey } from "@/lib/hooks/use-api-key";
@@ -23,7 +24,22 @@ interface InboxCountResponse {
 
 function ShellContent({ children }: { children: React.ReactNode }) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  useKeyboardShortcuts({ onOpenShortcutsModal: () => setShortcutsOpen(true) });
+  const copilotOpen = useCopilotStore((s) => s.isOpen);
+  const openCopilot = useCopilotStore((s) => s.open);
+  const closeCopilot = useCopilotStore((s) => s.close);
+
+  const handleToggleCopilot = () => {
+    if (copilotOpen) {
+      closeCopilot();
+    } else {
+      openCopilot();
+    }
+  };
+
+  useKeyboardShortcuts({
+    onOpenShortcutsModal: () => setShortcutsOpen(true),
+    onToggleCopilot: handleToggleCopilot,
+  });
 
   return (
     <>
@@ -40,7 +56,6 @@ export default function ShellLayout({
 }) {
   const router = useRouter();
   const { apiKey, hydrated } = useApiKey();
-  const [copilotOpen, setCopilotOpen] = useState(false);
 
   useEffect(() => {
     if (hydrated && !apiKey) {
@@ -84,8 +99,8 @@ export default function ShellLayout({
           </MainArea>
         </div>
 
-        {/* 右側 Copilot 佔位 */}
-        <CopilotSlot open={copilotOpen} onClose={() => setCopilotOpen(false)} />
+        {/* 右側 Copilot Panel（zustand 管理開關狀態，跨路由保持） */}
+        <CopilotPanel />
 
         {/* 全域 Command Palette overlay */}
         <CommandPalette />
