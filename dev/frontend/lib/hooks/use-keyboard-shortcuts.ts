@@ -16,6 +16,7 @@ import { useCmdk } from "@/components/cmdk/cmdk-provider";
 
 export interface UseKeyboardShortcutsOptions {
   onOpenShortcutsModal: () => void;
+  onToggleCopilot?: () => void;
 }
 
 const SEQUENTIAL_TIMEOUT_MS = 500;
@@ -27,6 +28,7 @@ function isInputFocused(): boolean {
 
 export function useKeyboardShortcuts({
   onOpenShortcutsModal,
+  onToggleCopilot,
 }: UseKeyboardShortcutsOptions): void {
   const router = useRouter();
   const { toggle: toggleCmdk } = useCmdk();
@@ -43,6 +45,14 @@ export function useKeyboardShortcuts({
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         toggleCmdk();
+        lastKeyRef.current = null;
+        return;
+      }
+
+      // ⌘J — 開啟/關閉 Copilot Panel（不受 input focus 影響）
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        onToggleCopilot?.();
         lastKeyRef.current = null;
         return;
       }
