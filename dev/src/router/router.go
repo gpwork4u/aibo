@@ -12,7 +12,7 @@ import (
 )
 
 // Setup 設定路由
-func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler, calendarHandler *handler.CalendarHandler, journalHandler *handler.JournalHandler, journalDraftHandler *handler.JournalDraftHandler, journalAutoHandler *handler.JournalAutoHandler, projectHandler *handler.ProjectHandler, taskHandler *handler.TaskHandler, githubIntegrationHandler *handler.GitHubIntegrationHandler, githubCommitsHandler *handler.GitHubCommitsHandler, viewHandler *handler.ViewHandler, entryLinksHandler *handler.EntryLinksHandler) *gin.Engine {
+func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *handler.ApiKeyHandler, categoryHandler *handler.CategoryHandler, llmProviderHandler *handler.LlmProviderHandler, entryHandler *handler.EntryHandler, classifyHandler *handler.ClassifyHandler, searchHandler *handler.SearchHandler, gitImportHandler *handler.GitImportHandler, gcalHandler *handler.GcalHandler, confidenceHandler *handler.ConfidenceHandler, statsHandler *handler.StatsHandler, systemHandler *handler.SystemHandler, lifecycleHandler *handler.LifecycleHandler, calendarConvertHandler *handler.CalendarConvertHandler, calendarHandler *handler.CalendarHandler, journalHandler *handler.JournalHandler, journalDraftHandler *handler.JournalDraftHandler, journalAutoHandler *handler.JournalAutoHandler, projectHandler *handler.ProjectHandler, taskHandler *handler.TaskHandler, githubIntegrationHandler *handler.GitHubIntegrationHandler, githubCommitsHandler *handler.GitHubCommitsHandler, viewHandler *handler.ViewHandler, entryLinksHandler *handler.EntryLinksHandler, copilotHandler *handler.CopilotHandler) *gin.Engine {
 	r := gin.Default()
 
 	// CORS middleware — 允許跨網域（前端 localhost:3000 呼叫 API localhost:8080）
@@ -207,6 +207,16 @@ func Setup(pool *pgxpool.Pool, apiKeySvc *service.ApiKeyService, apiKeyHandler *
 
 		// Knowledge Graph（F-044）
 		v1.GET("/graph", entryLinksHandler.GetGraph)
+
+		// Copilot（F-048）
+		copilot := v1.Group("/copilot")
+		{
+			copilot.POST("/sessions", copilotHandler.CreateSession)
+			copilot.DELETE("/sessions/:id", copilotHandler.DeleteSession)
+			copilot.GET("/sessions/:id/messages", copilotHandler.ListMessages)
+			copilot.POST("/message", copilotHandler.SendMessage)
+			copilot.GET("/stream", copilotHandler.Stream)
+		}
 	}
 
 	return r

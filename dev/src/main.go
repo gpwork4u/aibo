@@ -171,8 +171,13 @@ func main() {
 	entryLinksRepo := repository.NewEntryLinksRepository(pool)
 	entryLinksHandler := handler.NewEntryLinksHandler(entryLinksRepo)
 
+	// 初始化 Copilot 服務（F-048）
+	copilotRepo := repository.NewCopilotRepository(pool)
+	copilotSvc := service.NewCopilotService(copilotRepo, entryRepo, llmSvc)
+	copilotHandler := handler.NewCopilotHandler(copilotSvc)
+
 	// 設定路由
-	r := router.Setup(pool, apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, journalAutoHandler, projectHandler, taskHandler, githubIntegrationHandler, githubCommitsHandler, viewHandler, entryLinksHandler)
+	r := router.Setup(pool, apiKeySvc, apiKeyHandler, categoryHandler, llmProviderHandler, entryHandler, classifyHandler, searchHandler, gitImportHandler, gcalHandler, confidenceHandler, statsHandler, systemHandler, lifecycleHandler, calendarConvertHandler, calendarHandler, journalHandler, journalDraftHandler, journalAutoHandler, projectHandler, taskHandler, githubIntegrationHandler, githubCommitsHandler, viewHandler, entryLinksHandler, copilotHandler)
 
 	// 啟動 HTTP server（graceful shutdown）
 	srv := &http.Server{
