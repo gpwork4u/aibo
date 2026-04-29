@@ -90,7 +90,7 @@ export function QuickCreateModal({ open, onOpenChange, onDone }: QuickCreateModa
       const tags = parseTags();
       if (tags.length > 0) payload.tags = tags;
 
-      const res = await apiClient.post<CreateEntryPayload, CreateEntryResponse>(
+      const res = await apiClient.post<CreateEntryResponse>(
         "/api/v1/entries",
         payload,
       );
