@@ -1,0 +1,13 @@
+# Prod override — image 改用 GHCR，build 區塊清掉。
+# env 變數由 deploy.yml 從 GitHub Environment secrets/vars 注入。
+
+services:
+  api:
+    image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER required}/aibo-api:${API_TAG:-prod}
+    pull_policy: always
+    build: !reset null
+
+  frontend:
+    image: ghcr.io/${GHCR_OWNER}/aibo-frontend:${FRONTEND_TAG:-prod}
+    pull_policy: always
+    build: !reset null

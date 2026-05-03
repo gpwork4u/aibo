@@ -1,0 +1,150 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_tag:
+        description: 'api image tag (預設: prod)'
+        required: false
+        default: 'prod'
+      frontend_tag:
+        description: 'frontend image tag (預設: prod)'
+        required: false
+        default: 'prod'
+
+env:
+  REGISTRY: ghcr.io
+  GHCR_OWNER: ${{ github.repository_owner }}
+  SERVICE_NAME: aibo
+  NGINX_CONFD: /Volumes/2tb/project/common-service/infra/nginx/conf.d
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    environment: production
+    env:
+      DOCKER_CONFIG: ${{ github.workspace }}/.docker-config
+      API_TAG:      ${{ inputs.api_tag      || 'prod' }}
+      FRONTEND_TAG: ${{ inputs.frontend_tag || 'prod' }}
+      DATABASE_URL:        ${{ secrets.DATABASE_URL }}
+      AIBO_ENCRYPTION_KEY: ${{ secrets.AIBO_ENCRYPTION_KEY }}
+      NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://aibo.gwp4.com/api' }}
+      API_PORT:            ${{ vars.API_PORT      || '8080' }}
+      FRONTEND_PORT:       ${{ vars.FRONTEND_PORT || '3000' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PATH
+        run: |
+          echo "/usr/local/bin" >> $GITHUB_PATH
+          echo "/opt/homebrew/bin" >> $GITHUB_PATH
+          echo "/Users/$(whoami)/.orbstack/bin" >> $GITHUB_PATH
+
+      - name: Setup isolated DOCKER_CONFIG with auth + linked plugins
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p "$DOCKER_CONFIG/cli-plugins"
+          for plugin in /Users/$(whoami)/.docker/cli-plugins/*; do
+            ln -sf "$plugin" "$DOCKER_CONFIG/cli-plugins/$(basename "$plugin")"
+          done
+          AUTH=$(printf '%s:%s' "${{ github.actor }}" "$GHCR_TOKEN" | base64)
+          cat > "$DOCKER_CONFIG/config.json" <<JSON
+          {
+            "auths": {
+              "${{ env.REGISTRY }}": { "auth": "$AUTH" }
+            }
+          }
+          JSON
+
+      - name: Sync nginx conf + reload (test 失敗會 abort)
+        run: |
+          if [[ -f "${NGINX_CONFD}/${SERVICE_NAME}.conf" ]]; then
+            cp "${NGINX_CONFD}/${SERVICE_NAME}.conf" \
+               "${NGINX_CONFD}/.${SERVICE_NAME}.conf.bak"
+          fi
+
+          cp "nginx/${SERVICE_NAME}.conf" "${NGINX_CONFD}/${SERVICE_NAME}.conf"
+
+          if ! docker exec nginx-proxy nginx -t -c /etc/nginx/nginx.conf; then
+            echo "✗ nginx -t 失敗，回退 conf"
+            if [[ -f "${NGINX_CONFD}/.${SERVICE_NAME}.conf.bak" ]]; then
+              mv "${NGINX_CONFD}/.${SERVICE_NAME}.conf.bak" \
+                 "${NGINX_CONFD}/${SERVICE_NAME}.conf"
+            else
+              rm "${NGINX_CONFD}/${SERVICE_NAME}.conf"
+            fi
+            exit 1
+          fi
+
+          docker exec nginx-proxy nginx -s reload
+          echo "✓ nginx conf synced + reloaded"
+
+          rm -f "${NGINX_CONFD}/.${SERVICE_NAME}.conf.bak"
+
+      - name: Snapshot current running tags (for rollback)
+        id: snap
+        run: |
+          for svc_container in api:${SERVICE_NAME}-api-1 frontend:${SERVICE_NAME}-frontend-1; do
+            svc="${svc_container%%:*}"
+            cn="${svc_container##*:}"
+            PREV=$(docker inspect --format='{{.Config.Image}}' "$cn" 2>/dev/null | awk -F: '{print $NF}' || true)
+            if [[ -z "${PREV}" || "${PREV}" == "latest" ]]; then PREV="prod"; fi
+            echo "${svc}_prev=${PREV}" >> "$GITHUB_OUTPUT"
+            echo "  ${svc}: 目前 ${PREV}"
+          done
+
+      - name: Deploy in ephemeral tmp dir
+        run: |
+          TMP=$(mktemp -d -t deploy-${SERVICE_NAME}.XXXXXX)
+          trap "rm -rf $TMP" EXIT
+
+          cp docker-compose.yml docker-compose.prod.yml "$TMP/"
+          cd "$TMP"
+
+          docker compose -p "${SERVICE_NAME}" \
+            -f docker-compose.yml -f docker-compose.prod.yml pull
+          docker compose -p "${SERVICE_NAME}" \
+            -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+
+      - name: Healthcheck (繞過 Cloudflare, 直連本機 nginx)
+        run: |
+          DOMAIN="${SERVICE_NAME}.gwp4.com"
+          for i in {1..20}; do
+            if curl -k -fsS -m 5 --resolve "${DOMAIN}:443:127.0.0.1" "https://${DOMAIN}/" >/dev/null \
+               && curl -k -fsS -m 5 --resolve "${DOMAIN}:443:127.0.0.1" "https://${DOMAIN}/api/" >/dev/null; then
+              echo "✓ healthy after ${i} attempts"
+              exit 0
+            fi
+            echo "… not ready (${i}/20)"
+            sleep 3
+          done
+          echo "✗ healthcheck failed" >&2
+          exit 1
+
+      - name: Auto-rollback
+        if: failure() && steps.snap.outcome == 'success'
+        env:
+          API_TAG:      ${{ steps.snap.outputs.api_prev }}
+          FRONTEND_TAG: ${{ steps.snap.outputs.frontend_prev }}
+        run: |
+          TMP=$(mktemp -d -t rollback-${SERVICE_NAME}.XXXXXX)
+          trap "rm -rf $TMP" EXIT
+
+          cp docker-compose.yml docker-compose.prod.yml "$TMP/"
+          cd "$TMP"
+
+          echo "✗ rollback to api=${API_TAG} frontend=${FRONTEND_TAG}"
+          docker compose -p "${SERVICE_NAME}" \
+            -f docker-compose.yml -f docker-compose.prod.yml pull
+          docker compose -p "${SERVICE_NAME}" \
+            -f docker-compose.yml -f docker-compose.prod.yml up -d
+          exit 1
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "✓ ${SERVICE_NAME} deployed"
+          echo "  api:      ${API_TAG}"
+          echo "  frontend: ${FRONTEND_TAG}"
+          echo "  https://${SERVICE_NAME}.gwp4.com/"

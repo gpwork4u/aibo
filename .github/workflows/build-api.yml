@@ -1,0 +1,60 @@
+name: build-api
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dev/src/**'
+      - '.github/workflows/build-api.yml'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  GHCR_OWNER: ${{ github.repository_owner }}
+  IMAGE_NAME: aibo-api
+  DOCKER_CONFIG: ${{ github.workspace }}/.docker-config
+
+jobs:
+  build:
+    runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PATH
+        run: |
+          echo "/usr/local/bin" >> $GITHUB_PATH
+          echo "/opt/homebrew/bin" >> $GITHUB_PATH
+
+      - name: Setup isolated DOCKER_CONFIG with auth + cli-plugins
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p "$DOCKER_CONFIG/cli-plugins"
+          for plugin in /Users/$(whoami)/.docker/cli-plugins/*; do
+            ln -sf "$plugin" "$DOCKER_CONFIG/cli-plugins/$(basename "$plugin")"
+          done
+          AUTH=$(printf '%s:%s' "${{ github.actor }}" "$GHCR_TOKEN" | base64)
+          cat > "$DOCKER_CONFIG/config.json" <<JSON
+          {
+            "auths": {
+              "${{ env.REGISTRY }}": { "auth": "$AUTH" }
+            }
+          }
+          JSON
+
+      - id: tag
+        run: echo "tag=$(date +%Y.%m.%d)-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push (native arm64)
+        run: |
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.GHCR_OWNER }}/${{ env.IMAGE_NAME }}"
+          docker buildx build \
+            --platform linux/arm64 \
+            --push \
+            -t "${IMAGE_TAG}:${{ steps.tag.outputs.tag }}" \
+            -t "${IMAGE_TAG}:prod" \
+            ./dev/src
+          echo "✓ pushed ${IMAGE_TAG}:${{ steps.tag.outputs.tag }} (also :prod)"
