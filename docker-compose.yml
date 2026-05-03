@@ -1,10 +1,15 @@
+# Base compose — 本地開發用 .env，prod 由 deploy.yml 從 GitHub Environment 注入 shell env
+# 不含 db service：本地開發連既有 OrbStack postgres，prod 連外部 DB
+
 services:
   api:
     build:
       context: ./dev/src
       dockerfile: Dockerfile
-    env_file:
-      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SERVER_PORT: "8080"
+      AIBO_ENCRYPTION_KEY: ${AIBO_ENCRYPTION_KEY}
     ports:
       - "${API_PORT:-8080}:8080"
     restart: unless-stopped
@@ -14,7 +19,7 @@ services:
       context: ./dev/frontend
       dockerfile: Dockerfile
       args:
-        # NEXT_PUBLIC_* 必須在 build 階段固定（runtime env 設定會觸發 Next.js 14 standalone bug，造成 (dashboard) routes 全 404）
+        # NEXT_PUBLIC_* 必須在 build 階段固定（Next.js 14 standalone bug）
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     environment:
       NODE_ENV: production
